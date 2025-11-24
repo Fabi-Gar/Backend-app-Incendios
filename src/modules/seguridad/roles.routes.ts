@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { AppDataSource } from '../../db/data-source'
 import { guardAdmin, guardAuth } from '../../middlewares/auth'
+import { paginatedQuery } from '../../utils/pagination'
 
 const router = Router()
 
@@ -22,26 +23,26 @@ router.get('/', guardAuth, async (req, res, next) => {
     const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1)
     const pageSize = Math.min(Math.max(parseInt(String(req.query.pageSize || '50'), 10) || 50, 1), 200)
 
-    const countRows = await AppDataSource.query(
-      `SELECT COUNT(*)::int AS total
-       FROM roles
-       WHERE eliminado_en IS NULL
-         AND ($1 = '' OR nombre ILIKE '%' || $1 || '%')`,
-      [q]
-    )
-    const total = countRows?.[0]?.total ?? 0
+    const result = await paginatedQuery({
+      table: 'roles',
+      searchColumn: 'nombre',
+      searchTerm: q,
+      page,
+      pageSize,
+      orderBy: 'nombre',
+      orderDirection: 'ASC'
+    })
 
-    const items = await AppDataSource.query(
-      `SELECT rol_uuid AS id, nombre, descripcion, creado_en, actualizado_en
-       FROM roles
-       WHERE eliminado_en IS NULL
-         AND ($1 = '' OR nombre ILIKE '%' || $1 || '%')
-       ORDER BY nombre ASC
-       LIMIT $2 OFFSET $3`,
-      [q, pageSize, (page - 1) * pageSize]
-    )
+    // Renombrar rol_uuid a id para mantener compatibilidad
+    const items = result.items.map((r: any) => ({
+      id: r.rol_uuid,
+      nombre: r.nombre,
+      descripcion: r.descripcion,
+      creado_en: r.creado_en,
+      actualizado_en: r.actualizado_en
+    }))
 
-    res.json({ total, page, pageSize, items })
+    res.json({ total: result.total, page: result.page, pageSize: result.pageSize, items })
   } catch (e) { next(e) }
 })
 

@@ -10,15 +10,17 @@ import { CierreRespuesta } from './entities/cierre-respuesta.entity'
 import { Incendio } from '../incendios/entities/incendio.entity'
 import { auditRecord } from '../auditoria/auditoria.service'
 import { notifyIncendioCerrado } from '../notificaciones/incendioNotify.service'
+import { notifyCierreEvento } from '../notificaciones/cierreNotify.service'
 import { Notificacion } from '../notificaciones/entities/notificacion.entity'
 import { getSubscribedUsers } from '../incendios/GetsuscribedUsers'
 import { IsNull } from 'typeorm'
+import { sendError, ErrorHelpers } from '../../utils/response'
 
 const router = Router()
 
 router.use(guardAuth)
 
-type CtxUser = { usuario_uuid?: string; is_admin?: boolean; es_miembro_institucion?: boolean }
+type CtxUser = { usuario_uuid?: string; is_admin?: boolean; es_miembro_institucion?: boolean; nombre?: string; institucion_uuid?: string }
 
 // Helper: Verificar permisos de edición
 async function canEdit(user: CtxUser, incendio_uuid: string, incendio: any): Promise<boolean> {
@@ -45,7 +47,7 @@ router.get('/:incendio_uuid', async (req, res, next) => {
       where: { incendio_uuid, eliminado_en: IsNull() }
     })
 
-    if (!incendio) return res.status(404).json({ code: 'NOT_FOUND', message: 'Incendio no encontrado' })
+    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
 
     // Obtener la plantilla activa
     const plantilla = await AppDataSource.getRepository(CierrePlantilla).findOne({
@@ -53,7 +55,7 @@ router.get('/:incendio_uuid', async (req, res, next) => {
     })
 
     if (!plantilla) {
-      return res.status(404).json({ code: 'NO_ACTIVE_TEMPLATE', message: 'No hay plantilla activa' })
+      return ErrorHelpers.notFound(res, 'No hay plantilla activa configurada')
     }
 
     // Obtener secciones y campos de la plantilla
@@ -116,7 +118,7 @@ router.get('/:incendio_uuid', async (req, res, next) => {
       secciones: seccionesConCampos
     })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -147,15 +149,16 @@ router.post('/:incendio_uuid/respuestas', async (req, res, next) => {
     )
     const incendio = incendioRow?.[0]
 
-    if (!incendio) return res.status(404).json({ code: 'NOT_FOUND', message: 'Incendio no encontrado' })
+    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
 
     // Verificar permisos
     if (!await canEdit(user, incendio_uuid, incendio)) {
-      return res.status(403).json({ code: 'FORBIDDEN', message: 'No tienes permisos para editar este cierre' })
+      return ErrorHelpers.forbidden(res, 'No tienes permisos para editar este cierre')
     }
 
     const repo = AppDataSource.getRepository(CierreRespuesta)
     const saved: string[] = []
+    const camposActualizados: Array<{ nombre: string; valor: string }> = []
 
     for (const r of respuestas) {
       // Verificar que el campo existe
@@ -200,6 +203,22 @@ router.post('/:incendio_uuid/respuestas', async (req, res, next) => {
 
       await repo.save(respuesta)
       saved.push(respuesta.respuesta_uuid)
+
+      // Recopilar información para notificación
+      let valorStr = ''
+      if (r.valor_texto) valorStr = r.valor_texto
+      else if (r.valor_numero !== null && r.valor_numero !== undefined) valorStr = String(r.valor_numero)
+      else if (r.valor_boolean !== null && r.valor_boolean !== undefined) valorStr = r.valor_boolean ? 'Sí' : 'No'
+      else if (r.valor_fecha) valorStr = new Date(r.valor_fecha).toLocaleDateString()
+      else if (r.valor_datetime) valorStr = new Date(r.valor_datetime).toLocaleString()
+      else if (r.valor_json) valorStr = Array.isArray(r.valor_json) ? `${r.valor_json.length} opciones` : 'datos'
+
+      if (valorStr) {
+        camposActualizados.push({
+          nombre: campo.nombre,
+          valor: valorStr.length > 50 ? valorStr.substring(0, 50) + '...' : valorStr
+        })
+      }
     }
 
     await auditRecord({
@@ -211,9 +230,75 @@ router.post('/:incendio_uuid/respuestas', async (req, res, next) => {
       ctx: res.locals.ctx
     })
 
+    // Enviar notificación si se actualizaron campos
+    if (camposActualizados.length > 0) {
+      try {
+        // Obtener título del incendio
+        const incendioInfo = await AppDataSource.query(
+          `SELECT titulo FROM incendios WHERE incendio_uuid = $1`,
+          [incendio_uuid]
+        )
+        const titulo = incendioInfo?.[0]?.titulo || 'Incendio'
+
+        // Obtener seguidores
+        const seguidores = await getSubscribedUsers(incendio_uuid, 'avisarmeActualizaciones')
+
+        // Crear resumen de campos actualizados
+        const resumen = camposActualizados.length === 1
+          ? `${camposActualizados[0].nombre}: ${camposActualizados[0].valor}`
+          : camposActualizados.length <= 3
+            ? camposActualizados.map(c => `${c.nombre}: ${c.valor}`).join(', ')
+            : `${camposActualizados.length} campos actualizados`
+
+        // Enviar notificación push
+        await notifyCierreEvento({
+          type: 'cierre_actualizado',
+          incendio: {
+            id: incendio_uuid,
+            titulo,
+            creadorUserId: incendio.creado_por_uuid,
+            seguidoresUserIds: seguidores
+          },
+          autorNombre: user.nombre || 'Usuario',
+          resumen
+        })
+
+        // Guardar notificación en BD para el creador
+        const notiRepo = AppDataSource.getRepository(Notificacion)
+        await notiRepo.save({
+          usuario_uuid: incendio.creado_por_uuid,
+          tipo: 'cierre_actualizado',
+          titulo: '📝 Cierre actualizado',
+          mensaje: `${titulo}: ${resumen}`,
+          payload: {
+            incendio_id: incendio_uuid,
+            campos_actualizados: camposActualizados.length
+          }
+        })
+
+        // Guardar notificación para seguidores
+        for (const suscriptorId of seguidores) {
+          if (suscriptorId !== incendio.creado_por_uuid && suscriptorId !== user.usuario_uuid) {
+            await notiRepo.save({
+              usuario_uuid: suscriptorId,
+              tipo: 'cierre_actualizado',
+              titulo: '📝 Cierre actualizado',
+              mensaje: `${titulo}: ${resumen}`,
+              payload: {
+                incendio_id: incendio_uuid,
+                campos_actualizados: camposActualizados.length
+              }
+            })
+          }
+        }
+      } catch (notifError) {
+        console.error('[cierre] Error enviando notificación:', notifError)
+      }
+    }
+
     return res.json({ ok: true, respuestas_guardadas: saved.length })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -237,11 +322,11 @@ router.patch('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =>
     )
     const incendio = incendioRow?.[0]
 
-    if (!incendio) return res.status(404).json({ code: 'NOT_FOUND', message: 'Incendio no encontrado' })
+    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
 
     // Verificar permisos
     if (!await canEdit(user, incendio_uuid, incendio)) {
-      return res.status(403).json({ code: 'FORBIDDEN', message: 'No tienes permisos para editar este cierre' })
+      return ErrorHelpers.forbidden(res, 'No tienes permisos para editar este cierre')
     }
 
     // Verificar que el campo existe
@@ -249,7 +334,7 @@ router.patch('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =>
       where: { campo_uuid, eliminado_en: IsNull() }
     })
 
-    if (!campo) return res.status(404).json({ code: 'NOT_FOUND', message: 'Campo no encontrado' })
+    if (!campo) return ErrorHelpers.notFound(res, 'Campo no encontrado')
 
     const repo = AppDataSource.getRepository(CierreRespuesta)
     let respuesta = await repo.findOne({
@@ -295,9 +380,79 @@ router.patch('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =>
       ctx: res.locals.ctx
     })
 
+    // Enviar notificación
+    try {
+      // Obtener título del incendio
+      const incendioInfo = await AppDataSource.query(
+        `SELECT titulo FROM incendios WHERE incendio_uuid = $1`,
+        [incendio_uuid]
+      )
+      const titulo = incendioInfo?.[0]?.titulo || 'Incendio'
+
+      // Obtener seguidores
+      const seguidores = await getSubscribedUsers(incendio_uuid, 'avisarmeActualizaciones')
+
+      // Determinar valor actualizado
+      let valorStr = ''
+      if (body.valor_texto) valorStr = body.valor_texto
+      else if (body.valor_numero !== null && body.valor_numero !== undefined) valorStr = String(body.valor_numero)
+      else if (body.valor_boolean !== null && body.valor_boolean !== undefined) valorStr = body.valor_boolean ? 'Sí' : 'No'
+      else if (body.valor_fecha) valorStr = new Date(body.valor_fecha).toLocaleDateString()
+      else if (body.valor_datetime) valorStr = new Date(body.valor_datetime).toLocaleString()
+      else if (body.valor_json) valorStr = Array.isArray(body.valor_json) ? `${body.valor_json.length} opciones` : 'datos'
+
+      const resumen = valorStr
+        ? `${campo.nombre}: ${valorStr.length > 50 ? valorStr.substring(0, 50) + '...' : valorStr}`
+        : `${campo.nombre} actualizado`
+
+      // Enviar notificación push
+      await notifyCierreEvento({
+        type: 'cierre_actualizado',
+        incendio: {
+          id: incendio_uuid,
+          titulo,
+          creadorUserId: incendio.creado_por_uuid,
+          seguidoresUserIds: seguidores
+        },
+        autorNombre: user.nombre || 'Usuario',
+        resumen
+      })
+
+      // Guardar notificación en BD para el creador
+      const notiRepo = AppDataSource.getRepository(Notificacion)
+      await notiRepo.save({
+        usuario_uuid: incendio.creado_por_uuid,
+        tipo: 'cierre_actualizado',
+        titulo: '📝 Cierre actualizado',
+        mensaje: `${titulo}: ${resumen}`,
+        payload: {
+          incendio_id: incendio_uuid,
+          campo_actualizado: campo.nombre
+        }
+      })
+
+      // Guardar notificación para seguidores
+      for (const suscriptorId of seguidores) {
+        if (suscriptorId !== incendio.creado_por_uuid && suscriptorId !== user.usuario_uuid) {
+          await notiRepo.save({
+            usuario_uuid: suscriptorId,
+            tipo: 'cierre_actualizado',
+            titulo: '📝 Cierre actualizado',
+            mensaje: `${titulo}: ${resumen}`,
+            payload: {
+              incendio_id: incendio_uuid,
+              campo_actualizado: campo.nombre
+            }
+          })
+        }
+      }
+    } catch (notifError) {
+      console.error('[cierre] Error enviando notificación:', notifError)
+    }
+
     return res.json({ ok: true, respuesta_uuid: respuesta.respuesta_uuid })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -320,11 +475,11 @@ router.delete('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =
     )
     const incendio = incendioRow?.[0]
 
-    if (!incendio) return res.status(404).json({ code: 'NOT_FOUND', message: 'Incendio no encontrado' })
+    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
 
     // Verificar permisos
     if (!await canEdit(user, incendio_uuid, incendio)) {
-      return res.status(403).json({ code: 'FORBIDDEN', message: 'No tienes permisos para editar este cierre' })
+      return ErrorHelpers.forbidden(res, 'No tienes permisos para editar este cierre')
     }
 
     const repo = AppDataSource.getRepository(CierreRespuesta)
@@ -336,7 +491,7 @@ router.delete('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =
       }
     })
 
-    if (!respuesta) return res.status(404).json({ code: 'NOT_FOUND', message: 'Respuesta no encontrada' })
+    if (!respuesta) return ErrorHelpers.notFound(res, 'Respuesta no encontrada')
 
     respuesta.eliminado_en = new Date()
     await repo.save(respuesta)
@@ -352,7 +507,7 @@ router.delete('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -365,7 +520,7 @@ router.post('/:incendio_uuid/finalizar', async (req, res, next) => {
 
     // Solo admin puede finalizar
     if (!user?.is_admin) {
-      return res.status(403).json({ code: 'FORBIDDEN', message: 'Solo administradores pueden finalizar incendios' })
+      return ErrorHelpers.forbidden(res, 'Solo administradores pueden finalizar incendios')
     }
 
     const repo = AppDataSource.getRepository(Incendio)
@@ -373,7 +528,7 @@ router.post('/:incendio_uuid/finalizar', async (req, res, next) => {
       where: { incendio_uuid, eliminado_en: IsNull() }
     })
 
-    if (!incendio) return res.status(404).json({ code: 'NOT_FOUND', message: 'Incendio no encontrado' })
+    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
 
     // Verificar si ya está extinguido
     if ((incendio as any).extinguido_at) {
@@ -442,7 +597,7 @@ router.post('/:incendio_uuid/finalizar', async (req, res, next) => {
 
     return res.json({ ok: true, extinguido_at })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })

@@ -14,18 +14,17 @@ export async function getSubscribedUsers(
 
     const columnName = columnMap[tipoNotificacion];
 
-    // 1. Obtener departamento y municipio del incendio
+    // 1. Obtener departamento y municipio del incendio (desde tabla incendios)
     const incendioData = await AppDataSource.query(
-      `SELECT r.departamento_uuid, r.municipio_uuid
-       FROM reportes r
-       WHERE r.incendio_uuid = $1 AND r.eliminado_en IS NULL
-       ORDER BY r.reportado_en DESC NULLS LAST, r.creado_en DESC
+      `SELECT i.departamento_uuid, i.municipio_uuid
+       FROM incendios i
+       WHERE i.incendio_uuid = $1 AND i.eliminado_en IS NULL
        LIMIT 1`,
       [incendio_uuid]
     )
 
     if (!incendioData?.[0]) {
-      console.warn(`[getSubscribedUsers] No se encontró reporte para incendio ${incendio_uuid}`)
+      console.warn(`[getSubscribedUsers] No se encontró incendio ${incendio_uuid}`)
       return []
     }
 

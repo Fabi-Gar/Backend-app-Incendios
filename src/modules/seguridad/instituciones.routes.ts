@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { AppDataSource } from '../../db/data-source'
 import { guardAdmin, guardAuth } from '../../middlewares/auth'
+import { paginatedQuery } from '../../utils/pagination'
 
 const router = Router()
 
@@ -20,26 +21,25 @@ router.get('/', guardAuth, async (req, res, next) => {
     const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1)
     const pageSize = Math.min(Math.max(parseInt(String(req.query.pageSize || '50'), 10) || 50, 1), 200)
 
-    const totalRows = await AppDataSource.query(
-      `SELECT COUNT(*)::int AS total
-       FROM instituciones
-       WHERE eliminado_en IS NULL
-         AND ($1 = '' OR nombre ILIKE '%' || $1 || '%')`,
-      [q]
-    )
-    const total = totalRows?.[0]?.total ?? 0
+    const result = await paginatedQuery({
+      table: 'instituciones',
+      searchColumn: 'nombre',
+      searchTerm: q,
+      page,
+      pageSize,
+      orderBy: 'nombre',
+      orderDirection: 'ASC'
+    })
 
-    const items = await AppDataSource.query(
-      `SELECT institucion_uuid AS id, nombre, creado_en, actualizado_en
-       FROM instituciones
-       WHERE eliminado_en IS NULL
-         AND ($1 = '' OR nombre ILIKE '%' || $1 || '%')
-       ORDER BY nombre ASC
-       LIMIT $2 OFFSET $3`,
-      [q, pageSize, (page - 1) * pageSize]
-    )
+    // Renombrar institucion_uuid a id para mantener compatibilidad
+    const items = result.items.map((i: any) => ({
+      id: i.institucion_uuid,
+      nombre: i.nombre,
+      creado_en: i.creado_en,
+      actualizado_en: i.actualizado_en
+    }))
 
-    res.json({ total, page, pageSize, items })
+    res.json({ total: result.total, page: result.page, pageSize: result.pageSize, items })
   } catch (e) { next(e) }
 })
 

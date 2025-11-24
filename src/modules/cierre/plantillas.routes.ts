@@ -7,6 +7,7 @@ import { CierrePlantilla } from './entities/cierre-plantilla.entity'
 import { CierreSeccion } from './entities/cierre-seccion.entity'
 import { CierreCampo } from './entities/cierre-campo.entity'
 import { auditRecord } from '../auditoria/auditoria.service'
+import { sendError, ErrorHelpers } from '../../utils/response'
 
 const router = Router()
 
@@ -54,7 +55,7 @@ router.post('/plantillas', async (req, res, next) => {
 
     return res.status(201).json(plantilla)
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -85,7 +86,7 @@ router.get('/plantillas/:plantilla_uuid', async (req, res, next) => {
       relations: ['creado_por']
     })
 
-    if (!plantilla) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
 
     const secciones = await AppDataSource.getRepository(CierreSeccion).find({
       where: { plantilla_uuid, eliminado_en: null as any },
@@ -104,7 +105,7 @@ router.get('/plantillas/:plantilla_uuid', async (req, res, next) => {
 
     return res.json({ ...plantilla, secciones: seccionesConCampos })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -120,7 +121,7 @@ router.patch('/plantillas/:plantilla_uuid', async (req, res, next) => {
       where: { plantilla_uuid, eliminado_en: null as any }
     })
 
-    if (!plantilla) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
 
     const antes = { nombre: plantilla.nombre, descripcion: plantilla.descripcion }
 
@@ -140,7 +141,7 @@ router.patch('/plantillas/:plantilla_uuid', async (req, res, next) => {
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -155,11 +156,11 @@ router.delete('/plantillas/:plantilla_uuid', async (req, res, next) => {
       where: { plantilla_uuid, eliminado_en: null as any }
     })
 
-    if (!plantilla) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
 
     // No se puede eliminar la plantilla activa
     if (plantilla.activa) {
-      return res.status(400).json({ code: 'BAD_REQUEST', message: 'No se puede eliminar la plantilla activa' })
+      return ErrorHelpers.badRequest(res, 'No se puede eliminar la plantilla activa')
     }
 
     plantilla.eliminado_en = new Date()
@@ -176,7 +177,7 @@ router.delete('/plantillas/:plantilla_uuid', async (req, res, next) => {
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -191,7 +192,7 @@ router.post('/plantillas/:plantilla_uuid/activar', async (req, res, next) => {
       where: { plantilla_uuid, eliminado_en: null as any }
     })
 
-    if (!plantilla) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
 
     // Desactivar todas las demás plantillas
     await repo.update({ activa: true }, { activa: false })
@@ -211,7 +212,7 @@ router.post('/plantillas/:plantilla_uuid/activar', async (req, res, next) => {
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -244,7 +245,7 @@ router.post('/plantillas/:plantilla_uuid/secciones', async (req, res, next) => {
       where: { plantilla_uuid, eliminado_en: null as any }
     })
 
-    if (!plantilla) return res.status(404).json({ code: 'NOT_FOUND', message: 'Plantilla no encontrada' })
+    if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
 
     const repo = AppDataSource.getRepository(CierreSeccion)
     const seccion = repo.create({
@@ -268,7 +269,7 @@ router.post('/plantillas/:plantilla_uuid/secciones', async (req, res, next) => {
 
     return res.status(201).json(seccion)
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -284,7 +285,7 @@ router.patch('/secciones/:seccion_uuid', async (req, res, next) => {
       where: { seccion_uuid, eliminado_en: null as any }
     })
 
-    if (!seccion) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!seccion) return ErrorHelpers.notFound(res, 'Sección no encontrada')
 
     const antes = { nombre: seccion.nombre, descripcion: seccion.descripcion, orden: seccion.orden }
 
@@ -306,7 +307,7 @@ router.patch('/secciones/:seccion_uuid', async (req, res, next) => {
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -321,7 +322,7 @@ router.delete('/secciones/:seccion_uuid', async (req, res, next) => {
       where: { seccion_uuid, eliminado_en: null as any }
     })
 
-    if (!seccion) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!seccion) return ErrorHelpers.notFound(res, 'Sección no encontrada')
 
     seccion.eliminado_en = new Date()
     await repo.save(seccion)
@@ -337,7 +338,7 @@ router.delete('/secciones/:seccion_uuid', async (req, res, next) => {
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -373,7 +374,7 @@ router.post('/secciones/:seccion_uuid/campos', async (req, res, next) => {
       where: { seccion_uuid, eliminado_en: null as any }
     })
 
-    if (!seccion) return res.status(404).json({ code: 'NOT_FOUND', message: 'Sección no encontrada' })
+    if (!seccion) return ErrorHelpers.notFound(res, 'Sección no encontrada')
 
     const repo = AppDataSource.getRepository(CierreCampo)
     const campo = repo.create({
@@ -405,7 +406,7 @@ router.post('/secciones/:seccion_uuid/campos', async (req, res, next) => {
 
     return res.status(201).json(campo)
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -421,7 +422,7 @@ router.patch('/campos/:campo_uuid', async (req, res, next) => {
       where: { campo_uuid, eliminado_en: null as any }
     })
 
-    if (!campo) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!campo) return ErrorHelpers.notFound(res, 'Campo no encontrado')
 
     const antes = { ...campo }
 
@@ -451,7 +452,7 @@ router.patch('/campos/:campo_uuid', async (req, res, next) => {
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
@@ -466,7 +467,7 @@ router.delete('/campos/:campo_uuid', async (req, res, next) => {
       where: { campo_uuid, eliminado_en: null as any }
     })
 
-    if (!campo) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!campo) return ErrorHelpers.notFound(res, 'Campo no encontrado')
 
     campo.eliminado_en = new Date()
     await repo.save(campo)
@@ -482,7 +483,7 @@ router.delete('/campos/:campo_uuid', async (req, res, next) => {
 
     return res.json({ ok: true })
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
