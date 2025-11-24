@@ -4,7 +4,6 @@ import { Usuario } from '../../seguridad/entities/usuario.entity'
 import { IncendioEstadoHistorial } from '../../incendios/entities/incendio-estado-historial.entity'
 import { FotoReporte } from '../../incendios/entities/foto-reporte.entity'
 import { IncendioRegistroResponsable } from '../../responsable/entities/incendio-registro-responsable.entity'
-import { CierreOperaciones } from '../../cierre/entities/cierre-operaciones.entity'
 import { ZonaAfectada } from '../../geoespacial/entities/zona-afectada.entity'
 import { PuntoCalor } from '../../geoespacial/entities/punto-calor.entity'
 import { CierreEventosOperativos } from '../../eventos/entities/cierre-eventos-operativos.entity'
@@ -45,10 +44,6 @@ export class Actualizacion {
   @ManyToOne(() => IncendioRegistroResponsable, { nullable: true })
   @JoinColumn({ name: 'responsable_incendio_uuid', referencedColumnName: 'incendio_uuid', foreignKeyConstraintName: 'fk_actualizaciones_responsable_uuid' })
   responsable!: IncendioRegistroResponsable | null
-
-  @ManyToOne(() => CierreOperaciones, { nullable: true })
-  @JoinColumn({ name: 'cierre_incendio_uuid', referencedColumnName: 'incendio_uuid', foreignKeyConstraintName: 'fk_actualizaciones_cierre_uuid' })
-  cierre!: CierreOperaciones | null
 
   @ManyToOne(() => ZonaAfectada, { nullable: true })
   @JoinColumn({ name: 'zona_afectada_uuid', referencedColumnName: 'zona_afectada_uuid', foreignKeyConstraintName: 'fk_actualizaciones_zona_uuid' })

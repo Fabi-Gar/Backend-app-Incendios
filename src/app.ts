@@ -34,6 +34,7 @@ import puntosCalorRoutes from './modules/geoespacial/puntos-calor.routes'
 import monitorRoutes from './app/monitor.routes'
 import departamentosRoutes from './modules/catalogos/entities/departamentos.routes'
 import cierreRoutes from './modules/cierre/cierre.routes'
+import plantillasRoutes from './modules/cierre/plantillas.routes'
 
 // Subidas (fotos de incendio)
 import fotosReporteRoutes from './uploads/fotos-reporte.routes'
@@ -104,6 +105,7 @@ app.use('/firms', firmsRoutes)
 app.use('/monitor', monitorRoutes)
 app.use('/departamentos', departamentosRoutes)
 app.use('/cierre', cierreRoutes)
+app.use('/cierre-admin', plantillasRoutes)
 app.use('/instituciones', institucionesRoutes)
 app.use('/puntos-calor', puntosCalorRoutes)
 app.use(estadosIncendioRoutes)

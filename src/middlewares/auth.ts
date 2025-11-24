@@ -74,6 +74,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       nombre: (user as any).nombre,
       apellido: (user as any).apellido,
       is_admin: !!(user as any).is_admin,
+      es_miembro_institucion: !!(user as any).es_miembro_institucion,
       rol_uuid: (user as any)?.rol?.rol_uuid ?? null,
       institucion_uuid: (user as any)?.institucion?.institucion_uuid ?? null,
     } as any

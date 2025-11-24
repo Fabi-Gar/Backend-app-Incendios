@@ -98,6 +98,10 @@ export class Incendio {
 
   // =============================================================================
 
+  // Fecha de extinción del incendio (cierre final)
+  @Column({ type: 'timestamptz', nullable: true })
+  extinguido_at!: Date | null
+
   @CreateDateColumn({ type: 'timestamptz', name: 'creado_en', default: () => 'now()' })
   creado_en!: Date
 

@@ -34,6 +34,9 @@ export class Usuario {
   @Column({ type: 'boolean', name: 'is_admin', default: false })
   is_admin!: boolean
 
+  @Column({ type: 'boolean', name: 'es_miembro_institucion', default: false })
+  es_miembro_institucion!: boolean
+
   @Column({ type: 'timestamptz', nullable: true })
   ultimo_login!: Date | null
 
