@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgis/postgis:15-3.4
+    environment:
+      POSTGRES_DB: appIncendios2
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 58905326
+      TZ: America/Guatemala
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U postgres -d appIncendios2"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--appendonly","yes"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: development
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: 58905326
+      DB_NAME: appIncendios2
+      DB_SSL: "false"
+      REDIS_URL: redis://redis:6379
+      TZ: America/Guatemala
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["/bin/sh", "/app/docker/entrypoint.sh"]
+    # Quita los volúmenes si estás corriendo desde dist. Si quieres hot-reload, mantenlos:
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
+    restart: unless-stopped
+
+volumes:
+  db_data: {} 

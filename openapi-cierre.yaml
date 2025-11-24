@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Cierre de Incendios API
+  version: 1.0.0
+servers:
+  - url: http://localhost:4000
+paths:
+  /cierre/init:
+    post:
+      summary: Inicia (o asegura) registros base de cierre
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incendio_uuid]
+              properties:
+                incendio_uuid: { type: string, format: uuid }
+      responses:
+        '201': { description: Creado }
+        '403': { description: Permisos }
+        '404': { description: No existe }
+  /cierre/{incendio_uuid}/catalogos:
+    patch:
+      summary: Actualiza bloques de catálogos del cierre (idempotente)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: incendio_uuid
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CierreCatalogosPayload'
+      responses:
+        '200': { description: OK }
+        '400': { description: BAD_REQUEST (validación) }
+        '403': { description: PERMISSION_DENIED / CERRADO_SOLO_ADMIN }
+        '404': { description: NOT_FOUND }
+  /cierre/{incendio_uuid}/finalizar:
+    post:
+      summary: Marca el cierre como finalizado (extinguido) — solo admin
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: incendio_uuid
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { description: Solo admin }
+        '404': { description: NOT_FOUND }
+  /cierre/{incendio_uuid}:
+    get:
+      summary: Obtiene resumen consolidado del cierre
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: incendio_uuid
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CierreResumen'
+        '404': { description: NOT_FOUND }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CierreCatalogosPayload:
+      type: object
+      properties:
+        tipo_incendio_principal_id: { type: string }
+        composicion_tipo:
+          type: array
+          items:
+            type: object
+            properties:
+              tipo_incendio_id: { type: string }
+              pct: { type: number, minimum: 0 }
+        topografia:
+          type: object
+          properties:
+            plano_pct: { type: number, minimum: 0 }
+            ondulado_pct: { type: number, minimum: 0 }
+            quebrado_pct: { type: number, minimum: 0 }
+        propiedad:
+          type: array
+          items:
+            type: object
+            properties:
+              tipo_propiedad_id: { type: string }
+              usado: { type: boolean }
+        iniciado_junto_a:
+          type: object
+          properties:
+            iniciado_id: { type: string }
+            otro_texto: { type: string, nullable: true }
+        secuencia_control:
+          type: object
+          properties:
+            llegada_medios_terrestres_at: { type: string, format: date-time, nullable: true }
+            llegada_medios_aereos_at: { type: string, format: date-time, nullable: true }
+            controlado_at: { type: string, format: date-time, nullable: true }
+            extinguido_at: { type: string, format: date-time, nullable: true }
+        superficie:
+          type: object
+          properties:
+            area_total_ha: { type: number, minimum: 0 }
+            dentro_ap_ha: { type: number, minimum: 0 }
+            fuera_ap_ha: { type: number, minimum: 0 }
+            nombre_ap: { type: string, nullable: true }
+        superficie_vegetacion:
+          type: array
+          items:
+            type: object
+            properties:
+              ubicacion: { type: string, enum: [DENTRO_AP, FUERA_AP] }
+              categoria: { type: string, enum: [bosque_natural, plantacion_forestal, otra_vegetacion] }
+              subtipo: { type: string, nullable: true }
+              area_ha: { type: number, minimum: 0 }
+        tecnicas:
+          type: array
+          items:
+            type: object
+            properties:
+              tecnica: { type: string, enum: [directo, indirecto, control_natural] }
+              pct: { type: number, minimum: 0 }
+        medios_terrestres:
+          type: array
+          items:
+            type: object
+            properties:
+              medio_terrestre_id: { type: string }
+              cantidad: { type: number, minimum: 0 }
+        medios_aereos:
+          type: array
+          items:
+            type: object
+            properties:
+              medio_aereo_id: { type: string }
+              pct: { type: number, minimum: 0 }
+        medios_acuaticos:
+          type: array
+          items:
+            type: object
+            properties:
+              medio_acuatico_id: { type: string }
+              cantidad: { type: number, minimum: 0 }
+        medios_instituciones:
+          type: array
+          items:
+            type: object
+            properties:
+              institucion_uuid: { type: string, format: uuid }
+        abastos:
+          type: array
+          items:
+            type: object
+            properties:
+              abasto_id: { type: string }
+              cantidad: { type: number, minimum: 0 }
+        causa:
+          type: object
+          properties:
+            causa_id: { type: string }
+            otro_texto: { type: string, nullable: true }
+        meteo:
+          type: object
+          properties:
+            temp_c: { type: number, nullable: true }
+            hr_pct: { type: number, nullable: true }
+            viento_vel: { type: number, nullable: true }
+            viento_dir: { type: string, nullable: true }
+
+    CierreResumen:
+      type: object
+      properties:
+        incendio_uuid: { type: string, format: uuid }
+        cerrado: { type: boolean }
+        tipo_incendio_principal_id: { type: string, nullable: true }
+        composicion_tipo: { type: array, items: { type: object } }
+        topografia: { type: object, nullable: true }
+        propiedad: { type: array, items: { type: object } }
+        iniciado_junto_a: { type: object, nullable: true }
+        secuencia_control: { type: object, nullable: true }
+        superficie: { type: object, nullable: true }
+        superficie_vegetacion: { type: array, items: { type: object } }
+        tecnicas: { type: array, items: { type: object } }
+        medios: { type: object }
+        abastos: { type: array, items: { type: object } }
+        causa: { type: object, nullable: true }
+        meteo: { type: object, nullable: true }
