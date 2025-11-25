@@ -63,9 +63,14 @@ fi
 
 # Ejecutar seeds solo si quieres (SEED_ON_START=true por defecto)
 if [ "${SEED_ON_START:-true}" = "true" ]; then
-  echo "🌱 Ejecutando seeds (dist, idempotentes)…"
+  echo "🌱 Ejecutando seed principal (dist, idempotente)…"
   if ! npm run seed:dist; then
-    echo "⚠️  Seeds retornaron error (posible repetición). Continuando…"
+    echo "⚠️  Seed principal retornó error (posible repetición). Continuando…"
+  fi
+
+  echo "🌱 Ejecutando seed de plantilla de cierre (dist, idempotente)…"
+  if ! npm run seed:plantilla:dist; then
+    echo "⚠️  Seed de plantilla retornó error (posible repetición). Continuando…"
   fi
 else
   echo "🌱 Seeds desactivados (SEED_ON_START=false)"

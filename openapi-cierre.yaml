@@ -1,13 +1,46 @@
 openapi: 3.0.3
 info:
-  title: Cierre de Incendios API
-  version: 1.0.0
+  title: Sistema Dinámico de Cierre de Incendios API
+  description: |
+    API para gestión de formularios dinámicos de cierre de incendios forestales.
+
+    ## Arquitectura
+    - **Plantillas**: Definidas por administradores, contienen secciones y campos
+    - **Secciones**: Agrupan campos relacionados (ej: "Datos Generales", "Superficie Afectada")
+    - **Campos**: Formularios con múltiples tipos de datos y validaciones
+    - **Respuestas**: Valores ingresados por usuarios para cada campo
+
+    ## Permisos
+    - **Administradores**: Pueden crear/editar plantillas y finalizar incendios
+    - **Usuarios autenticados**: Pueden llenar formularios de cierre
+    - **Miembros de institución**: Pueden editar cierres de incendios no finalizados
+  version: 2.0.0
+  contact:
+    name: API Support
+
 servers:
   - url: http://localhost:4000
+    description: Desarrollo local
+  - url: https://api.incendios.gob.gt
+    description: Producción
+
+tags:
+  - name: Admin - Plantillas
+    description: Gestión de plantillas de formularios (solo admin)
+  - name: Admin - Secciones
+    description: Gestión de secciones dentro de plantillas (solo admin)
+  - name: Admin - Campos
+    description: Gestión de campos dentro de secciones (solo admin)
+  - name: Usuarios - Cierre
+    description: Llenado y consulta de formularios de cierre
+
 paths:
-  /cierre/init:
+  # ==================== ADMIN - PLANTILLAS ====================
+  /cierre-admin/plantillas:
     post:
-      summary: Inicia (o asegura) registros base de cierre
+      tags: [Admin - Plantillas]
+      summary: Crear nueva plantilla de formulario
+      description: Solo administradores pueden crear plantillas
       security: [{ bearerAuth: [] }]
       requestBody:
         required: true
@@ -15,193 +48,942 @@ paths:
           application/json:
             schema:
               type: object
-              required: [incendio_uuid]
+              required: [nombre]
               properties:
-                incendio_uuid: { type: string, format: uuid }
+                nombre:
+                  type: string
+                  example: "Formulario de Cierre v2.0"
+                descripcion:
+                  type: string
+                  nullable: true
+                  example: "Plantilla actualizada con campos de superficie mejorados"
+                version:
+                  type: integer
+                  default: 1
+                  example: 1
       responses:
-        '201': { description: Creado }
-        '403': { description: Permisos }
-        '404': { description: No existe }
-  /cierre/{incendio_uuid}/catalogos:
-    patch:
-      summary: Actualiza bloques de catálogos del cierre (idempotente)
+        '201':
+          description: Plantilla creada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plantilla'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    get:
+      tags: [Admin - Plantillas]
+      summary: Listar todas las plantillas
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Lista de plantillas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    example: 3
+                  plantillas:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Plantilla'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /cierre-admin/plantillas/{plantilla_uuid}:
+    get:
+      tags: [Admin - Plantillas]
+      summary: Obtener plantilla con secciones y campos
+      description: Retorna la estructura completa de la plantilla
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: incendio_uuid
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/PlantillaUuid'
+      responses:
+        '200':
+          description: Plantilla completa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlantillaCompleta'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Admin - Plantillas]
+      summary: Actualizar plantilla
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PlantillaUuid'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                descripcion:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Plantilla actualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Admin - Plantillas]
+      summary: Eliminar plantilla (soft delete)
+      description: No se puede eliminar la plantilla activa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PlantillaUuid'
+      responses:
+        '200':
+          description: Plantilla eliminada
+        '400':
+          description: No se puede eliminar plantilla activa
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /cierre-admin/plantillas/{plantilla_uuid}/activar:
+    post:
+      tags: [Admin - Plantillas]
+      summary: Activar plantilla
+      description: |
+        Activa esta plantilla y desactiva todas las demás.
+        Solo puede haber una plantilla activa a la vez.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PlantillaUuid'
+      responses:
+        '200':
+          description: Plantilla activada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== ADMIN - SECCIONES ====================
+  /cierre-admin/plantillas/{plantilla_uuid}/secciones:
+    post:
+      tags: [Admin - Secciones]
+      summary: Agregar sección a plantilla
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PlantillaUuid'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CierreCatalogosPayload'
+              type: object
+              required: [nombre, orden]
+              properties:
+                nombre:
+                  type: string
+                  example: "Superficie Afectada"
+                descripcion:
+                  type: string
+                  nullable: true
+                  example: "Información sobre el área afectada por el incendio"
+                orden:
+                  type: integer
+                  minimum: 0
+                  example: 1
+                icono:
+                  type: string
+                  nullable: true
+                  example: "fire"
       responses:
-        '200': { description: OK }
-        '400': { description: BAD_REQUEST (validación) }
-        '403': { description: PERMISSION_DENIED / CERRADO_SOLO_ADMIN }
-        '404': { description: NOT_FOUND }
-  /cierre/{incendio_uuid}/finalizar:
-    post:
-      summary: Marca el cierre como finalizado (extinguido) — solo admin
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - name: incendio_uuid
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200': { description: OK }
-        '403': { description: Solo admin }
-        '404': { description: NOT_FOUND }
-  /cierre/{incendio_uuid}:
-    get:
-      summary: Obtiene resumen consolidado del cierre
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - name: incendio_uuid
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: OK
+        '201':
+          description: Sección creada
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CierreResumen'
-        '404': { description: NOT_FOUND }
+                $ref: '#/components/schemas/Seccion'
+        '404':
+          description: Plantilla no encontrada
 
+  /cierre-admin/secciones/{seccion_uuid}:
+    patch:
+      tags: [Admin - Secciones]
+      summary: Actualizar sección
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: seccion_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre:
+                  type: string
+                descripcion:
+                  type: string
+                  nullable: true
+                orden:
+                  type: integer
+                icono:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Sección actualizada
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Admin - Secciones]
+      summary: Eliminar sección
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: seccion_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Sección eliminada
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== ADMIN - CAMPOS ====================
+  /cierre-admin/secciones/{seccion_uuid}/campos:
+    post:
+      tags: [Admin - Campos]
+      summary: Agregar campo a sección
+      description: |
+        Crea un campo dentro de una sección. Los campos pueden ser jerárquicos
+        usando campo_padre_uuid para crear sub-campos.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: seccion_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampoInput'
+            examples:
+              campoTexto:
+                summary: Campo de texto simple
+                value:
+                  nombre: "Nombre del responsable"
+                  tipo: "text"
+                  orden: 1
+                  requerido: true
+                  placeholder: "Ingrese nombre completo"
+              campoNumero:
+                summary: Campo numérico con validación
+                value:
+                  nombre: "Área afectada"
+                  tipo: "number"
+                  orden: 2
+                  requerido: true
+                  unidad: "hectáreas"
+                  validaciones:
+                    min: 0
+                    max: 100000
+              campoSelect:
+                summary: Campo de selección con opciones
+                value:
+                  nombre: "Tipo de vegetación"
+                  tipo: "select"
+                  orden: 3
+                  opciones:
+                    - { value: "bosque", label: "Bosque Natural" }
+                    - { value: "plantacion", label: "Plantación" }
+                    - { value: "matorral", label: "Matorral" }
+              campoJerarquico:
+                summary: Sub-campo (campo hijo)
+                value:
+                  campo_padre_uuid: "123e4567-e89b-12d3-a456-426614174000"
+                  nombre: "Especifique tipo de bosque"
+                  tipo: "text"
+                  orden: 1
+                  dependencias:
+                    campo_uuid: "parent-uuid"
+                    mostrar_si: "bosque"
+      responses:
+        '201':
+          description: Campo creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campo'
+        '404':
+          description: Sección no encontrada
+
+  /cierre-admin/campos/{campo_uuid}:
+    patch:
+      tags: [Admin - Campos]
+      summary: Actualizar campo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: campo_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampoInput'
+      responses:
+        '200':
+          description: Campo actualizado
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Admin - Campos]
+      summary: Eliminar campo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: campo_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Campo eliminado
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== USUARIOS - CIERRE ====================
+  /cierre/{incendio_uuid}:
+    get:
+      tags: [Usuarios - Cierre]
+      summary: Obtener formulario de cierre para un incendio
+      description: |
+        Retorna la plantilla activa con todas sus secciones, campos y respuestas
+        previamente guardadas para este incendio.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IncendioUuid'
+      responses:
+        '200':
+          description: Formulario de cierre con respuestas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CierreFormulario'
+        '404':
+          description: Incendio no encontrado o sin plantilla activa
+
+  /cierre/{incendio_uuid}/respuestas:
+    post:
+      tags: [Usuarios - Cierre]
+      summary: Guardar múltiples respuestas
+      description: |
+        Crea o actualiza múltiples respuestas de campos del formulario.
+        Envía notificaciones a seguidores del incendio.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IncendioUuid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [respuestas]
+              properties:
+                respuestas:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/RespuestaInput'
+            example:
+              respuestas:
+                - campo_uuid: "123e4567-e89b-12d3-a456-426614174001"
+                  valor_texto: "Juan Pérez"
+                - campo_uuid: "123e4567-e89b-12d3-a456-426614174002"
+                  valor_numero: 150.5
+                - campo_uuid: "123e4567-e89b-12d3-a456-426614174003"
+                  valor_boolean: true
+      responses:
+        '200':
+          description: Respuestas guardadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  respuestas_guardadas:
+                    type: integer
+                    example: 3
+        '403':
+          description: Sin permisos o incendio ya extinguido
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /cierre/{incendio_uuid}/respuestas/{campo_uuid}:
+    patch:
+      tags: [Usuarios - Cierre]
+      summary: Actualizar una respuesta específica
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IncendioUuid'
+        - name: campo_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RespuestaInput'
+            examples:
+              texto:
+                summary: Respuesta de texto
+                value:
+                  valor_texto: "Bosque de coníferas"
+              numero:
+                summary: Respuesta numérica
+                value:
+                  valor_numero: 250.75
+              fecha:
+                summary: Respuesta de fecha
+                value:
+                  valor_fecha: "2025-01-15"
+              multiple:
+                summary: Respuesta múltiple (JSON)
+                value:
+                  valor_json: ["opcion1", "opcion2", "opcion3"]
+      responses:
+        '200':
+          description: Respuesta actualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  respuesta_uuid:
+                    type: string
+                    format: uuid
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Usuarios - Cierre]
+      summary: Eliminar respuesta
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IncendioUuid'
+        - name: campo_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Respuesta eliminada
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /cierre/{incendio_uuid}/finalizar:
+    post:
+      tags: [Usuarios - Cierre]
+      summary: Finalizar incendio (marcar como extinguido)
+      description: |
+        Solo administradores pueden finalizar incendios.
+        Establece la fecha de extinción y envía notificaciones.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IncendioUuid'
+      responses:
+        '200':
+          description: Incendio finalizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  extinguido_at:
+                    type: string
+                    format: date-time
+                    example: "2025-01-20T15:30:00Z"
+        '403':
+          description: Solo administradores pueden finalizar
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ==================== COMPONENTS ====================
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: Token JWT obtenido del endpoint /auth/login
+
+  parameters:
+    PlantillaUuid:
+      name: plantilla_uuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID de la plantilla
+
+    IncendioUuid:
+      name: incendio_uuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID del incendio
 
   schemas:
-    CierreCatalogosPayload:
+    Plantilla:
       type: object
       properties:
-        tipo_incendio_principal_id: { type: string }
-        composicion_tipo:
-          type: array
-          items:
-            type: object
-            properties:
-              tipo_incendio_id: { type: string }
-              pct: { type: number, minimum: 0 }
-        topografia:
-          type: object
-          properties:
-            plano_pct: { type: number, minimum: 0 }
-            ondulado_pct: { type: number, minimum: 0 }
-            quebrado_pct: { type: number, minimum: 0 }
-        propiedad:
-          type: array
-          items:
-            type: object
-            properties:
-              tipo_propiedad_id: { type: string }
-              usado: { type: boolean }
-        iniciado_junto_a:
-          type: object
-          properties:
-            iniciado_id: { type: string }
-            otro_texto: { type: string, nullable: true }
-        secuencia_control:
-          type: object
-          properties:
-            llegada_medios_terrestres_at: { type: string, format: date-time, nullable: true }
-            llegada_medios_aereos_at: { type: string, format: date-time, nullable: true }
-            controlado_at: { type: string, format: date-time, nullable: true }
-            extinguido_at: { type: string, format: date-time, nullable: true }
-        superficie:
-          type: object
-          properties:
-            area_total_ha: { type: number, minimum: 0 }
-            dentro_ap_ha: { type: number, minimum: 0 }
-            fuera_ap_ha: { type: number, minimum: 0 }
-            nombre_ap: { type: string, nullable: true }
-        superficie_vegetacion:
-          type: array
-          items:
-            type: object
-            properties:
-              ubicacion: { type: string, enum: [DENTRO_AP, FUERA_AP] }
-              categoria: { type: string, enum: [bosque_natural, plantacion_forestal, otra_vegetacion] }
-              subtipo: { type: string, nullable: true }
-              area_ha: { type: number, minimum: 0 }
-        tecnicas:
-          type: array
-          items:
-            type: object
-            properties:
-              tecnica: { type: string, enum: [directo, indirecto, control_natural] }
-              pct: { type: number, minimum: 0 }
-        medios_terrestres:
-          type: array
-          items:
-            type: object
-            properties:
-              medio_terrestre_id: { type: string }
-              cantidad: { type: number, minimum: 0 }
-        medios_aereos:
-          type: array
-          items:
-            type: object
-            properties:
-              medio_aereo_id: { type: string }
-              pct: { type: number, minimum: 0 }
-        medios_acuaticos:
-          type: array
-          items:
-            type: object
-            properties:
-              medio_acuatico_id: { type: string }
-              cantidad: { type: number, minimum: 0 }
-        medios_instituciones:
-          type: array
-          items:
-            type: object
-            properties:
-              institucion_uuid: { type: string, format: uuid }
-        abastos:
-          type: array
-          items:
-            type: object
-            properties:
-              abasto_id: { type: string }
-              cantidad: { type: number, minimum: 0 }
-        causa:
-          type: object
-          properties:
-            causa_id: { type: string }
-            otro_texto: { type: string, nullable: true }
-        meteo:
-          type: object
-          properties:
-            temp_c: { type: number, nullable: true }
-            hr_pct: { type: number, nullable: true }
-            viento_vel: { type: number, nullable: true }
-            viento_dir: { type: string, nullable: true }
+        plantilla_uuid:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Formulario de Cierre v2.0"
+        descripcion:
+          type: string
+          nullable: true
+        activa:
+          type: boolean
+          description: Solo puede haber una plantilla activa
+        version:
+          type: integer
+          example: 1
+        creado_por:
+          $ref: '#/components/schemas/UsuarioBasico'
+        creado_en:
+          type: string
+          format: date-time
+        actualizado_en:
+          type: string
+          format: date-time
 
-    CierreResumen:
+    PlantillaCompleta:
+      allOf:
+        - $ref: '#/components/schemas/Plantilla'
+        - type: object
+          properties:
+            secciones:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/Seccion'
+                  - type: object
+                    properties:
+                      campos:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Campo'
+
+    Seccion:
       type: object
       properties:
-        incendio_uuid: { type: string, format: uuid }
-        cerrado: { type: boolean }
-        tipo_incendio_principal_id: { type: string, nullable: true }
-        composicion_tipo: { type: array, items: { type: object } }
-        topografia: { type: object, nullable: true }
-        propiedad: { type: array, items: { type: object } }
-        iniciado_junto_a: { type: object, nullable: true }
-        secuencia_control: { type: object, nullable: true }
-        superficie: { type: object, nullable: true }
-        superficie_vegetacion: { type: array, items: { type: object } }
-        tecnicas: { type: array, items: { type: object } }
-        medios: { type: object }
-        abastos: { type: array, items: { type: object } }
-        causa: { type: object, nullable: true }
-        meteo: { type: object, nullable: true }
+        seccion_uuid:
+          type: string
+          format: uuid
+        plantilla_uuid:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: "Datos Generales"
+        descripcion:
+          type: string
+          nullable: true
+        orden:
+          type: integer
+          description: Orden de visualización
+        icono:
+          type: string
+          nullable: true
+          example: "clipboard"
+        creado_en:
+          type: string
+          format: date-time
+        actualizado_en:
+          type: string
+          format: date-time
+
+    Campo:
+      type: object
+      properties:
+        campo_uuid:
+          type: string
+          format: uuid
+        seccion_uuid:
+          type: string
+          format: uuid
+        campo_padre_uuid:
+          type: string
+          format: uuid
+          nullable: true
+          description: Para campos jerárquicos (sub-campos)
+        nombre:
+          type: string
+          example: "Área total afectada"
+        descripcion:
+          type: string
+          nullable: true
+        placeholder:
+          type: string
+          nullable: true
+          example: "Ingrese el área en hectáreas"
+        tipo:
+          type: string
+          enum:
+            - text
+            - textarea
+            - number
+            - date
+            - datetime
+            - select
+            - multiselect
+            - checkbox
+            - radio
+            - file
+            - currency
+            - percentage
+        orden:
+          type: integer
+        requerido:
+          type: boolean
+        opciones:
+          type: array
+          nullable: true
+          description: Para select, multiselect, radio
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+              label:
+                type: string
+          example:
+            - { value: "bosque", label: "Bosque Natural" }
+            - { value: "plantacion", label: "Plantación" }
+        validaciones:
+          type: object
+          nullable: true
+          description: Validaciones adicionales (min, max, pattern, etc.)
+          example:
+            min: 0
+            max: 100000
+            pattern: "^[0-9]+$"
+        dependencias:
+          type: object
+          nullable: true
+          description: Condiciones para mostrar el campo
+          example:
+            campo_uuid: "parent-uuid"
+            mostrar_si: "bosque"
+        unidad:
+          type: string
+          nullable: true
+          example: "hectáreas"
+        ayuda:
+          type: string
+          nullable: true
+          description: Texto de ayuda para el usuario
+        creado_en:
+          type: string
+          format: date-time
+        actualizado_en:
+          type: string
+          format: date-time
+
+    CampoInput:
+      type: object
+      required: [nombre, tipo, orden]
+      properties:
+        campo_padre_uuid:
+          type: string
+          format: uuid
+          nullable: true
+        nombre:
+          type: string
+        descripcion:
+          type: string
+          nullable: true
+        placeholder:
+          type: string
+          nullable: true
+        tipo:
+          type: string
+          enum:
+            - text
+            - textarea
+            - number
+            - date
+            - datetime
+            - select
+            - multiselect
+            - checkbox
+            - radio
+            - file
+            - currency
+            - percentage
+        orden:
+          type: integer
+          minimum: 0
+        requerido:
+          type: boolean
+          default: false
+        opciones:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+              label:
+                type: string
+        validaciones:
+          type: object
+          nullable: true
+        dependencias:
+          type: object
+          nullable: true
+        unidad:
+          type: string
+          nullable: true
+        ayuda:
+          type: string
+          nullable: true
+
+    RespuestaInput:
+      type: object
+      required: [campo_uuid]
+      properties:
+        campo_uuid:
+          type: string
+          format: uuid
+        valor_texto:
+          type: string
+          nullable: true
+        valor_numero:
+          type: number
+          nullable: true
+        valor_fecha:
+          type: string
+          format: date
+          nullable: true
+        valor_datetime:
+          type: string
+          format: date-time
+          nullable: true
+        valor_boolean:
+          type: boolean
+          nullable: true
+        valor_json:
+          nullable: true
+          description: Para arrays o objetos complejos
+          oneOf:
+            - type: array
+            - type: object
+
+    Respuesta:
+      allOf:
+        - $ref: '#/components/schemas/RespuestaInput'
+        - type: object
+          properties:
+            respuesta_uuid:
+              type: string
+              format: uuid
+            incendio_uuid:
+              type: string
+              format: uuid
+            respondido_por_uuid:
+              type: string
+              format: uuid
+            actualizado_en:
+              type: string
+              format: date-time
+
+    CierreFormulario:
+      type: object
+      properties:
+        incendio_uuid:
+          type: string
+          format: uuid
+        plantilla:
+          type: object
+          properties:
+            plantilla_uuid:
+              type: string
+              format: uuid
+            nombre:
+              type: string
+            descripcion:
+              type: string
+              nullable: true
+            version:
+              type: integer
+        extinguido:
+          type: boolean
+          description: Indica si el incendio está finalizado
+        secciones:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Seccion'
+              - type: object
+                properties:
+                  campos:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Campo'
+                        - type: object
+                          properties:
+                            respuesta:
+                              $ref: '#/components/schemas/Respuesta'
+                              nullable: true
+
+    UsuarioBasico:
+      type: object
+      properties:
+        usuario_uuid:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          nullable: true
+        apellido:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: "NOT_FOUND"
+            message:
+              type: string
+              example: "Recurso no encontrado"
+        requestId:
+          type: string
+          format: uuid
+          description: ID de la petición para debugging
+
+  responses:
+    BadRequest:
+      description: Solicitud inválida
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "BAD_REQUEST"
+              message: "Datos de entrada inválidos"
+            requestId: "123e4567-e89b-12d3-a456-426614174000"
+
+    Unauthorized:
+      description: No autorizado - Token inválido o faltante
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "UNAUTHENTICATED"
+              message: "No autorizado"
+            requestId: "123e4567-e89b-12d3-a456-426614174000"
+
+    Forbidden:
+      description: Acceso denegado - Sin permisos suficientes
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "FORBIDDEN"
+              message: "Acceso denegado"
+            requestId: "123e4567-e89b-12d3-a456-426614174000"
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Recurso no encontrado"
+            requestId: "123e4567-e89b-12d3-a456-426614174000"

@@ -15,27 +15,13 @@ import { Notificacion } from '../notificaciones/entities/notificacion.entity'
 import { getSubscribedUsers } from '../incendios/GetsuscribedUsers'
 import { IsNull } from 'typeorm'
 import { sendError, ErrorHelpers } from '../../utils/response'
+import { loggers } from '../../utils/logger'
+import { loadIncendio, IncendioBasicData } from '../../middlewares/load-incendio'
+import { canEditCierre, canFinalizeIncendio, UserContext } from '../incendios/incendios.permissions'
 
 const router = Router()
 
 router.use(guardAuth)
-
-type CtxUser = { usuario_uuid?: string; is_admin?: boolean; es_miembro_institucion?: boolean; nombre?: string; institucion_uuid?: string }
-
-// Helper: Verificar permisos de edición
-async function canEdit(user: CtxUser, incendio_uuid: string, incendio: any): Promise<boolean> {
-  // Admin puede editar siempre
-  if (user?.is_admin) return true
-
-  // Si el incendio está extinguido, solo admin puede editar
-  if (incendio.extinguido_at) return false
-
-  // Creador o miembro de institución pueden editar
-  return !!(
-    user?.usuario_uuid === incendio.creado_por_uuid ||
-    user?.es_miembro_institucion
-  )
-}
 
 // GET /:incendio_uuid - Obtener formulario de cierre para un incendio
 router.get('/:incendio_uuid', async (req, res, next) => {
@@ -134,25 +120,15 @@ const respuestaSchema = z.object({
   valor_json: z.any().optional().nullable()
 })
 
-router.post('/:incendio_uuid/respuestas', async (req, res, next) => {
+router.post('/:incendio_uuid/respuestas', loadIncendio, async (req, res, next) => {
   try {
-    const { incendio_uuid } = z.object({ incendio_uuid: z.string().uuid() }).parse(req.params)
+    const { incendio_uuid } = req.params
     const { respuestas } = z.object({ respuestas: z.array(respuestaSchema) }).parse(req.body)
-    const user = res.locals.ctx?.user as CtxUser
-
-    // Verificar que el incendio existe
-    const incendioRow = await AppDataSource.query(
-      `SELECT incendio_uuid, creado_por_uuid, extinguido_at
-       FROM incendios
-       WHERE incendio_uuid = $1 AND eliminado_en IS NULL`,
-      [incendio_uuid]
-    )
-    const incendio = incendioRow?.[0]
-
-    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
+    const user = res.locals.ctx?.user as UserContext
+    const incendio = res.locals.incendio as IncendioBasicData
 
     // Verificar permisos
-    if (!await canEdit(user, incendio_uuid, incendio)) {
+    if (!canEditCierre(user, incendio)) {
       return ErrorHelpers.forbidden(res, 'No tienes permisos para editar este cierre')
     }
 
@@ -292,7 +268,7 @@ router.post('/:incendio_uuid/respuestas', async (req, res, next) => {
           }
         }
       } catch (notifError) {
-        console.error('[cierre] Error enviando notificación:', notifError)
+        loggers.cierre.error({ err: notifError }, 'Error enviando notificación')
       }
     }
 
@@ -304,28 +280,18 @@ router.post('/:incendio_uuid/respuestas', async (req, res, next) => {
 })
 
 // PATCH /:incendio_uuid/respuestas/:campo_uuid - Actualizar una sola respuesta
-router.patch('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) => {
+router.patch('/:incendio_uuid/respuestas/:campo_uuid', loadIncendio, async (req, res, next) => {
   try {
     const { incendio_uuid, campo_uuid } = z.object({
       incendio_uuid: z.string().uuid(),
       campo_uuid: z.string().uuid()
     }).parse(req.params)
     const body = respuestaSchema.omit({ campo_uuid: true }).parse(req.body)
-    const user = res.locals.ctx?.user as CtxUser
-
-    // Verificar que el incendio existe
-    const incendioRow = await AppDataSource.query(
-      `SELECT incendio_uuid, creado_por_uuid, extinguido_at
-       FROM incendios
-       WHERE incendio_uuid = $1 AND eliminado_en IS NULL`,
-      [incendio_uuid]
-    )
-    const incendio = incendioRow?.[0]
-
-    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
+    const user = res.locals.ctx?.user as UserContext
+    const incendio = res.locals.incendio as IncendioBasicData
 
     // Verificar permisos
-    if (!await canEdit(user, incendio_uuid, incendio)) {
+    if (!canEditCierre(user, incendio)) {
       return ErrorHelpers.forbidden(res, 'No tienes permisos para editar este cierre')
     }
 
@@ -447,7 +413,7 @@ router.patch('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =>
         }
       }
     } catch (notifError) {
-      console.error('[cierre] Error enviando notificación:', notifError)
+      loggers.cierre.error({ err: notifError }, 'Error enviando notificación')
     }
 
     return res.json({ ok: true, respuesta_uuid: respuesta.respuesta_uuid })
@@ -458,27 +424,17 @@ router.patch('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =>
 })
 
 // DELETE /:incendio_uuid/respuestas/:campo_uuid - Eliminar respuesta
-router.delete('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) => {
+router.delete('/:incendio_uuid/respuestas/:campo_uuid', loadIncendio, async (req, res, next) => {
   try {
     const { incendio_uuid, campo_uuid } = z.object({
       incendio_uuid: z.string().uuid(),
       campo_uuid: z.string().uuid()
     }).parse(req.params)
-    const user = res.locals.ctx?.user as CtxUser
-
-    // Verificar que el incendio existe
-    const incendioRow = await AppDataSource.query(
-      `SELECT incendio_uuid, creado_por_uuid, extinguido_at
-       FROM incendios
-       WHERE incendio_uuid = $1 AND eliminado_en IS NULL`,
-      [incendio_uuid]
-    )
-    const incendio = incendioRow?.[0]
-
-    if (!incendio) return ErrorHelpers.notFound(res, 'Incendio no encontrado')
+    const user = res.locals.ctx?.user as UserContext
+    const incendio = res.locals.incendio as IncendioBasicData
 
     // Verificar permisos
-    if (!await canEdit(user, incendio_uuid, incendio)) {
+    if (!canEditCierre(user, incendio)) {
       return ErrorHelpers.forbidden(res, 'No tienes permisos para editar este cierre')
     }
 
@@ -516,10 +472,10 @@ router.delete('/:incendio_uuid/respuestas/:campo_uuid', async (req, res, next) =
 router.post('/:incendio_uuid/finalizar', async (req, res, next) => {
   try {
     const { incendio_uuid } = z.object({ incendio_uuid: z.string().uuid() }).parse(req.params)
-    const user = res.locals.ctx?.user as CtxUser
+    const user = res.locals.ctx?.user as UserContext
 
     // Solo admin puede finalizar
-    if (!user?.is_admin) {
+    if (!canFinalizeIncendio(user)) {
       return ErrorHelpers.forbidden(res, 'Solo administradores pueden finalizar incendios')
     }
 

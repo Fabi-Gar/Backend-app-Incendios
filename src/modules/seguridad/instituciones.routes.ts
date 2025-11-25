@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { AppDataSource } from '../../db/data-source'
 import { guardAdmin, guardAuth } from '../../middlewares/auth'
 import { paginatedQuery } from '../../utils/pagination'
+import { validateUuidParams } from '../../middlewares/validate-uuid'
+import { ErrorHelpers } from '../../utils/response'
 
 const router = Router()
 
@@ -64,10 +66,10 @@ router.post('/', guardAdmin, async (req, res, next) => {
 })
 
 // PATCH /instituciones/:id — actualizar (admin)
-router.patch('/:id', guardAdmin, async (req, res, next) => {
+router.patch('/:id', guardAdmin, validateUuidParams('id'), async (req, res, next) => {
   try {
     const { nombre } = updateSchema.parse(req.body)
-    const id = String(req.params.id)
+    const id = req.params.id
 
     const rows = await AppDataSource.query(
       `UPDATE instituciones
@@ -77,18 +79,18 @@ router.patch('/:id', guardAdmin, async (req, res, next) => {
        RETURNING institucion_uuid AS id, nombre, creado_en, actualizado_en`,
       [nombre, id]
     )
-    if (!rows.length) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!rows.length) return ErrorHelpers.notFound(res, 'Institución no encontrada')
     res.json(rows[0])
   } catch (e: any) {
-    if (e?.issues) return res.status(400).json({ code: 'BAD_REQUEST', issues: e.issues })
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
     next(e)
   }
 })
 
 // DELETE /instituciones/:id — soft delete (admin)
-router.delete('/:id', guardAdmin, async (req, res, next) => {
+router.delete('/:id', guardAdmin, validateUuidParams('id'), async (req, res, next) => {
   try {
-    const id = String(req.params.id)
+    const id = req.params.id
 
     const rows = await AppDataSource.query(
       `UPDATE instituciones
@@ -97,7 +99,7 @@ router.delete('/:id', guardAdmin, async (req, res, next) => {
        RETURNING institucion_uuid AS id`,
       [id]
     )
-    if (!rows.length) return res.status(404).json({ code: 'NOT_FOUND' })
+    if (!rows.length) return ErrorHelpers.notFound(res, 'Institución no encontrada')
     res.json({ ok: true })
   } catch (e) { next(e) }
 })

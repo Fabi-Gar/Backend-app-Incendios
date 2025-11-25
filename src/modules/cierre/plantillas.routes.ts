@@ -8,6 +8,7 @@ import { CierreSeccion } from './entities/cierre-seccion.entity'
 import { CierreCampo } from './entities/cierre-campo.entity'
 import { auditRecord } from '../auditoria/auditoria.service'
 import { sendError, ErrorHelpers } from '../../utils/response'
+import { IsNull } from 'typeorm'
 
 const router = Router()
 
@@ -82,14 +83,14 @@ router.get('/plantillas/:plantilla_uuid', async (req, res, next) => {
     const { plantilla_uuid } = z.object({ plantilla_uuid: z.string().uuid() }).parse(req.params)
 
     const plantilla = await AppDataSource.getRepository(CierrePlantilla).findOne({
-      where: { plantilla_uuid, eliminado_en: null as any },
+      where: { plantilla_uuid, eliminado_en: IsNull() },
       relations: ['creado_por']
     })
 
     if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
 
     const secciones = await AppDataSource.getRepository(CierreSeccion).find({
-      where: { plantilla_uuid, eliminado_en: null as any },
+      where: { plantilla_uuid, eliminado_en: IsNull() },
       order: { orden: 'ASC' }
     })
 
@@ -118,7 +119,7 @@ router.patch('/plantillas/:plantilla_uuid', async (req, res, next) => {
 
     const repo = AppDataSource.getRepository(CierrePlantilla)
     const plantilla = await repo.findOne({
-      where: { plantilla_uuid, eliminado_en: null as any }
+      where: { plantilla_uuid, eliminado_en: IsNull() }
     })
 
     if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
@@ -153,7 +154,7 @@ router.delete('/plantillas/:plantilla_uuid', async (req, res, next) => {
 
     const repo = AppDataSource.getRepository(CierrePlantilla)
     const plantilla = await repo.findOne({
-      where: { plantilla_uuid, eliminado_en: null as any }
+      where: { plantilla_uuid, eliminado_en: IsNull() }
     })
 
     if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
@@ -189,7 +190,7 @@ router.post('/plantillas/:plantilla_uuid/activar', async (req, res, next) => {
 
     const repo = AppDataSource.getRepository(CierrePlantilla)
     const plantilla = await repo.findOne({
-      where: { plantilla_uuid, eliminado_en: null as any }
+      where: { plantilla_uuid, eliminado_en: IsNull() }
     })
 
     if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')
@@ -242,7 +243,7 @@ router.post('/plantillas/:plantilla_uuid/secciones', async (req, res, next) => {
     // Verificar que la plantilla existe
     const plantillaRepo = AppDataSource.getRepository(CierrePlantilla)
     const plantilla = await plantillaRepo.findOne({
-      where: { plantilla_uuid, eliminado_en: null as any }
+      where: { plantilla_uuid, eliminado_en: IsNull() }
     })
 
     if (!plantilla) return ErrorHelpers.notFound(res, 'Plantilla no encontrada')

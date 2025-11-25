@@ -18,6 +18,8 @@
     "migration:show": "npm run typeorm:dist -- migration:show",
     "seed:dist": "node dist/db/seeds/171004_seed_inicial.js",
     "seed": "tsx src/db/seeds/171004_seed_inicial.ts",
+    "seed:plantilla:dist": "node dist/db/seeds/172000_seed_plantilla_cierre.js",
+    "seed:plantilla": "tsx src/db/seeds/172000_seed_plantilla_cierre.ts",
     "lint": "echo 'lint placeholder'",
     "format": "echo 'format placeholder'"
   },

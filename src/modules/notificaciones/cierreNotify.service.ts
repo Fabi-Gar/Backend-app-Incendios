@@ -2,6 +2,7 @@
 import { PushPrefsRepo } from './pushPrefs.repo';
 import { sendFCMPush } from './fcmPush.service';
 import type { CierreUpdateType } from './push.types';
+import { loggers } from '../../utils/logger';
 
 async function tokensParaCierre(
   incendio: { id: string | number; creadorUserId: string; seguidoresUserIds?: string[] },
@@ -11,15 +12,15 @@ async function tokensParaCierre(
   if (primerReportanteUserId) userIds.add(String(primerReportanteUserId));
   (incendio.seguidoresUserIds || []).forEach(u => userIds.add(String(u)));
   
-  console.log('[tokensParaCierre] Buscando tokens para usuarios:', Array.from(userIds));
-  
+  loggers.notificacion.debug({ userIds: Array.from(userIds) }, 'Buscando tokens para cierre');
+
   // ✅ Filtrar tokens de usuarios que quieren recibir notificaciones de cierre
   const tokens = await PushPrefsRepo.getTokensForUserIdsWithPref(
     Array.from(userIds),
     'avisarmeCierres'
   );
-  
-  console.log('[tokensParaCierre] Tokens encontrados:', tokens.length);
+
+  loggers.notificacion.debug({ tokensCount: tokens.length }, 'Tokens encontrados para cierre');
   
   return tokens;
 }
@@ -38,15 +39,16 @@ export async function notifyCierreEvento(params: {
 }) {
   const { type, incendio, autorNombre, resumen, primerReportanteUserId } = params;
 
-  console.log('[notifyCierreEvento] Iniciando notificación de cierre');
-  console.log('  Tipo:', type);
-  console.log('  Incendio ID:', incendio.id);
-  console.log('  Seguidores:', incendio.seguidoresUserIds?.length || 0);
+  loggers.notificacion.info({
+    type,
+    incendio_id: incendio.id,
+    seguidores: incendio.seguidoresUserIds?.length || 0
+  }, 'Iniciando notificación de cierre');
 
   const tokens = await tokensParaCierre(incendio, primerReportanteUserId);
-  
+
   if (!tokens.length) {
-    console.log('⏭️ No hay tokens activos para notificar evento de cierre');
+    loggers.notificacion.debug('No hay tokens activos para notificar evento de cierre');
     return;
   }
 
@@ -63,9 +65,11 @@ export async function notifyCierreEvento(params: {
     resumen ? `• ${resumen}` : null,
   ].filter(Boolean).join(' ');
 
-  console.log(`📤 Enviando notificación a ${tokens.length} dispositivo(s)`);
-  console.log('  Título:', titles[type]);
-  console.log('  Cuerpo:', body);
+  loggers.notificacion.info({
+    tokens: tokens.length,
+    title: titles[type],
+    body
+  }, 'Enviando notificación de cierre');
 
   // ✅ Usar FCM en lugar de Expo
   await sendFCMPush(tokens, {
@@ -78,22 +82,22 @@ export async function notifyCierreEvento(params: {
     },
   });
 
-  console.log('✅ Notificaciones enviadas correctamente');
+  loggers.notificacion.info('Notificaciones de cierre enviadas correctamente');
 }
 
 export async function notifyCierreFinalizadoARegion(params: {
   incendio: { id: string | number; titulo?: string; regionCode: string };
 }) {
-  console.log('[notifyCierreFinalizadoARegion] Notificando a región:', params.incendio.regionCode);
-  
+  loggers.notificacion.info({ regionCode: params.incendio.regionCode }, 'Notificando cierre a región');
+
   const tokens = await PushPrefsRepo.getTokensByRegion(params.incendio.regionCode);
-  
+
   if (!tokens.length) {
-    console.log('⏭️ No hay tokens suscritos a la región');
+    loggers.notificacion.debug('No hay tokens suscritos a la región');
     return;
   }
-  
-  console.log(`📤 Enviando notificación regional a ${tokens.length} dispositivo(s)`);
+
+  loggers.notificacion.info({ tokens: tokens.length }, 'Enviando notificación regional');
   
   // ✅ Usar FCM en lugar de Expo
   await sendFCMPush(tokens, {
@@ -107,5 +111,5 @@ export async function notifyCierreFinalizadoARegion(params: {
     },
   });
 
-  console.log('✅ Notificación regional enviada');
+  loggers.notificacion.info('Notificación regional enviada');
 }

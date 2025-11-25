@@ -1,5 +1,6 @@
 // Helper para obtener usuarios suscritos a un incendio
 import { AppDataSource } from '../../db/data-source'
+import { loggers } from '../../utils/logger'
 
 export async function getSubscribedUsers(
   incendio_uuid: string,
@@ -24,7 +25,7 @@ export async function getSubscribedUsers(
     )
 
     if (!incendioData?.[0]) {
-      console.warn(`[getSubscribedUsers] No se encontró incendio ${incendio_uuid}`)
+      loggers.subscriptions.warn({ incendio_uuid }, 'No se encontró incendio')
       return []
     }
 
@@ -49,7 +50,7 @@ export async function getSubscribedUsers(
 
     return usuarios.map((u: any) => u.usuario_uuid)
   } catch (error) {
-    console.error('[getSubscribedUsers] Error obteniendo usuarios suscritos:', error)
+    loggers.subscriptions.error({ err: error, incendio_uuid, tipoNotificacion }, 'Error obteniendo usuarios suscritos')
     return []
   }
 }
