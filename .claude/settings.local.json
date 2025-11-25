@@ -5,7 +5,8 @@
       "Bash(npm run migration:create:*)",
       "Bash(npx tsx:*)",
       "Bash(docker compose:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(bash:*)"
     ],
     "deny": [],
     "ask": []
