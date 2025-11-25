@@ -29,12 +29,15 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
   // 🟢 Rutas públicas (no requieren token)
   const publicPaths = new Set<string>([
-    '/auth/login',
-    '/auth/register',
-    '/health/liveness',
-    '/health/readiness',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/firebase-login', // Login con Firebase
+    '/api/health/liveness',
+    '/api/health/readiness',
   ])
-  if (publicPaths.has(req.path)) {
+  // Usar url o originalUrl para capturar rutas montadas
+  const reqPath = req.originalUrl.split('?')[0] // Remover query params
+  if (publicPaths.has(reqPath)) {
     return next()
   }
 

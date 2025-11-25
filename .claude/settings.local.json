@@ -6,7 +6,8 @@
       "Bash(npx tsx:*)",
       "Bash(docker compose:*)",
       "Bash(curl:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []

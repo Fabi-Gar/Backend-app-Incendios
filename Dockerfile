@@ -38,7 +38,10 @@ RUN npm prune --omit=dev \
 # Copiamos build compilado
 COPY --from=build /app/dist ./dist
 
+# Copiar archivos de configuración necesarios (Firebase, etc.)
+COPY --from=build /app/src/config ./src/config
+
 EXPOSE 4000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD wget -qO- http://localhost:4000/health/liveness || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD wget -qO- http://localhost:4000/api/health/liveness || exit 1
 
 CMD ["node","dist/server.js"]

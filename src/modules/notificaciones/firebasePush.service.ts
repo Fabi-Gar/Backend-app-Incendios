@@ -9,8 +9,8 @@ export function initFirebase() {
 
   try {
     const serviceAccount = require(path.resolve(
-      process.cwd(), 
-      process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './config/firebase-service-account.json'
+      process.cwd(),
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH || './src/config/appincendios-f747c-firebase-adminsdk-fbsvc-181edc5898.json'
     ));
 
     admin.initializeApp({
@@ -23,6 +23,14 @@ export function initFirebase() {
     console.error('❌ Error inicializando Firebase:', error.message);
     throw error;
   }
+}
+
+// Export admin para usar en otros servicios (como auth)
+export function getFirebaseAdmin() {
+  if (!initialized) {
+    throw new Error('Firebase no está inicializado. Llama initFirebase() primero.');
+  }
+  return admin;
 }
 
 export async function sendFirebasePush(

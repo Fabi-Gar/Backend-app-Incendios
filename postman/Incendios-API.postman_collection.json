@@ -107,6 +107,48 @@
 						"description": "Obtener información del usuario autenticado"
 					},
 					"response": []
+				},
+				{
+					"name": "Firebase Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('token', jsonData.token);",
+									"    pm.environment.set('usuario_uuid', jsonData.usuario.usuario_uuid);",
+									"    console.log('Token guardado desde Firebase:', jsonData.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"idToken\": \"FIREBASE_ID_TOKEN_AQUI\",\n  \"expoPushToken\": \"ExponentPushToken[OPCIONAL]\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/firebase-login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "firebase-login"]
+						},
+						"description": "Login con Firebase Authentication (Google, Facebook, etc). El usuario hace login en el frontend con Firebase, luego envía el idToken aquí. El backend lo verifica, crea el usuario si no existe, y devuelve un JWT propio."
+					},
+					"response": []
 				}
 			]
 		},

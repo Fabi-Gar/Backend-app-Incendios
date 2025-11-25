@@ -78,40 +78,34 @@ app.use('/uploads', express.static(uploadsDir, {
 }))
 
 // ---------------- Rutas públicas básicas (antes de auth) ----------------
-app.use(healthRoutes)
+app.use('/api', healthRoutes)
 
 // ---------------- Contexto + Auth ----------------
 app.use(contextMiddleware)
 app.use(authMiddleware)
 
-// ---------------- Rutas de autenticación ----------------
-app.use('/auth', authRoutes)
-
-// ---------------- Rutas de notificaciones push ----------------
-app.use(pushRoutes) // POST /api/push/register, /api/push/prefs, /api/push/unregister
-app.use(notificacionesRoutes) // GET /api/notificaciones, POST /api/notificaciones/:id/leer
-
-// Ruta de prueba (solo en desarrollo)
-  app.use('/api', testPushRoutes) // POST /api/test-push
-
-// ---------------- Rutas principales ----------------
-app.use('/usuarios', usuariosRoutes)
-app.use('/incendios', incendiosRoutes)
-app.use('/seguidores', seguidoresRoutes)
-app.use('/incendios', fotosReporteRoutes)  // subir/servir fotos de incendios
-app.use('/catalogos', catalogosRoutes)
-app.use('/roles', rolesRoutes)
-app.use('/firms', firmsRoutes)
-app.use('/monitor', monitorRoutes)
-app.use('/departamentos', departamentosRoutes)
-app.use('/cierre', cierreRoutes)
-app.use('/cierre-admin', plantillasRoutes)
-app.use('/instituciones', institucionesRoutes)
-app.use('/puntos-calor', puntosCalorRoutes)
-app.use(estadosIncendioRoutes)
+// ---------------- Rutas con prefijo /api ----------------
+app.use('/api/auth', authRoutes)
+app.use('/api', pushRoutes) // POST /api/push/register, /api/push/prefs, /api/push/unregister
+app.use('/api', notificacionesRoutes) // GET /api/notificaciones, POST /api/notificaciones/:id/leer
+app.use('/api', testPushRoutes) // POST /api/test-push
+app.use('/api/usuarios', usuariosRoutes)
+app.use('/api/incendios', incendiosRoutes)
+app.use('/api/incendios', fotosReporteRoutes)  // subir/servir fotos de incendios
+app.use('/api/seguidores', seguidoresRoutes)
+app.use('/api/catalogos', catalogosRoutes)
+app.use('/api/roles', rolesRoutes)
+app.use('/api/firms', firmsRoutes)
+app.use('/api/monitor', monitorRoutes)
+app.use('/api/departamentos', departamentosRoutes)
+app.use('/api/cierre', cierreRoutes)
+app.use('/api/cierre-admin', plantillasRoutes)
+app.use('/api/instituciones', institucionesRoutes)
+app.use('/api/puntos-calor', puntosCalorRoutes)
+app.use('/api', estadosIncendioRoutes)
 
 // Ruta de prueba de autenticación
-app.get('/test-auth', (_req, res) => {
+app.get('/api/test-auth', (_req, res) => {
   res.json({ ok: true, user: res.locals.ctx?.user || null })
 })
 

@@ -85,6 +85,42 @@ Antes de crear un incendio, necesitas los UUIDs de catálogos:
 
 ---
 
+## 🔥 Login con Firebase (Opcional)
+
+El sistema también soporta login con Firebase Authentication (Google, Facebook, Apple, etc).
+
+### Cómo funciona:
+
+1. **Frontend:** Usuario hace login con Firebase
+   ```javascript
+   // En tu app React Native / Web
+   const result = await signInWithPopup(auth, googleProvider)
+   const idToken = await result.user.getIdToken()
+   ```
+
+2. **Postman:** Abre **Auth → Firebase Login**
+   - Reemplaza `FIREBASE_ID_TOKEN_AQUI` con el token del paso 1
+   - Click **Send**
+
+3. **Backend:**
+   - Verifica el token con Firebase
+   - Crea el usuario automáticamente si no existe
+   - Devuelve tu JWT propio
+
+✅ **El token se guarda automáticamente** igual que con login normal
+
+### Proveedores soportados:
+- ✅ Google
+- ✅ Facebook
+- ✅ Apple
+- ✅ Email/Password (Firebase)
+- ✅ Teléfono
+- ✅ GitHub, Twitter, etc.
+
+**Nota:** Los usuarios creados vía Firebase obtienen rol "USUARIO" por defecto.
+
+---
+
 ## 📚 Estructura de la Colección
 
 ```
@@ -92,7 +128,8 @@ Incendios Guatemala API
 ├── Auth
 │   ├── Login ⭐ (guarda token automáticamente)
 │   ├── Register
-│   └── Me
+│   ├── Me
+│   └── Firebase Login 🔥 (login con Google/Facebook/etc)
 ├── Incendios
 │   ├── Listar Incendios
 │   ├── Crear Incendio ⭐ (guarda UUID automáticamente)
