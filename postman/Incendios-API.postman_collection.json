@@ -1,0 +1,988 @@
+{
+	"info": {
+		"name": "Incendios Guatemala API",
+		"description": "Colección completa de endpoints del sistema de incendios forestales",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "incendios-api"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:4000",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('token', jsonData.token);",
+									"    pm.environment.set('usuario_uuid', jsonData.usuario.usuario_uuid);",
+									"    console.log('Token guardado:', jsonData.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@demo.local\",\n  \"password\": \"Admin123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Autenticación de usuario. El token se guarda automáticamente en las variables de entorno."
+					},
+					"response": []
+				},
+				{
+					"name": "Register",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Juan\",\n  \"apellido\": \"Pérez\",\n  \"email\": \"juan@example.com\",\n  \"password\": \"Password123!\",\n  \"telefono\": \"12345678\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Registro de nuevo usuario"
+					},
+					"response": []
+				},
+				{
+					"name": "Me",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "me"]
+						},
+						"description": "Obtener información del usuario autenticado"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Incendios",
+			"item": [
+				{
+					"name": "Listar Incendios",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/incendios?page=1&pageSize=10&aprobado=true",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "10"
+								},
+								{
+									"key": "aprobado",
+									"value": "true",
+									"description": "true, false, o omitir para todos"
+								},
+								{
+									"key": "estado",
+									"value": "ACTIVO",
+									"disabled": true
+								},
+								{
+									"key": "departamento_uuid",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "municipio_uuid",
+									"value": "",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Lista paginada de incendios con filtros"
+					},
+					"response": []
+				},
+				{
+					"name": "Crear Incendio",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.environment.set('incendio_uuid', jsonData.incendio_uuid);",
+									"    console.log('Incendio UUID guardado:', jsonData.incendio_uuid);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titulo\": \"Incendio forestal en Chiantla\",\n  \"descripcion\": \"Incendio reportado en zona boscosa cerca del centro\",\n  \"reportado_por_nombre\": \"Juan Pérez\",\n  \"telefono\": \"12345678\",\n  \"reportado_en\": \"2025-11-25T10:00:00Z\",\n  \"medio_uuid\": \"{{medio_uuid}}\",\n  \"departamento_uuid\": \"{{departamento_uuid}}\",\n  \"municipio_uuid\": \"{{municipio_uuid}}\",\n  \"lugar_poblado\": \"Chiantla Centro\",\n  \"centroide\": {\n    \"type\": \"Point\",\n    \"coordinates\": [-91.4714, 15.3197]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/incendios",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios"]
+						},
+						"description": "Crear nuevo incendio. El UUID se guarda automáticamente."
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener Incendio",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/incendios/{{incendio_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios", "{{incendio_uuid}}"]
+						},
+						"description": "Obtener detalles de un incendio específico"
+					},
+					"response": []
+				},
+				{
+					"name": "Actualizar Incendio",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titulo\": \"Incendio forestal en Chiantla - Actualizado\",\n  \"descripcion\": \"Descripción actualizada del incendio\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/incendios/{{incendio_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios", "{{incendio_uuid}}"]
+						},
+						"description": "Actualizar información de un incendio"
+					},
+					"response": []
+				},
+				{
+					"name": "Eliminar Incendio",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/incendios/{{incendio_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios", "{{incendio_uuid}}"]
+						},
+						"description": "Eliminar incendio (soft delete)"
+					},
+					"response": []
+				},
+				{
+					"name": "Aprobar Incendio (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/incendios/{{incendio_uuid}}/aprobar",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios", "{{incendio_uuid}}", "aprobar"]
+						},
+						"description": "Aprobar un incendio - Solo admin"
+					},
+					"response": []
+				},
+				{
+					"name": "Rechazar Incendio (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"motivo\": \"Información insuficiente o incorrecta\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/incendios/{{incendio_uuid}}/rechazar",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios", "{{incendio_uuid}}", "rechazar"]
+						},
+						"description": "Rechazar un incendio - Solo admin"
+					},
+					"response": []
+				},
+				{
+					"name": "Seguir Incendio",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/incendios/{{incendio_uuid}}/seguir",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios", "{{incendio_uuid}}", "seguir"]
+						},
+						"description": "Seguir un incendio para recibir notificaciones"
+					},
+					"response": []
+				},
+				{
+					"name": "Dejar de Seguir",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/incendios/{{incendio_uuid}}/seguir",
+							"host": ["{{base_url}}"],
+							"path": ["api", "incendios", "{{incendio_uuid}}", "seguir"]
+						},
+						"description": "Dejar de seguir un incendio"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Cierre",
+			"item": [
+				{
+					"name": "Obtener Formulario de Cierre",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cierre/{{incendio_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cierre", "{{incendio_uuid}}"]
+						},
+						"description": "Obtener formulario de cierre dinámico con respuestas existentes"
+					},
+					"response": []
+				},
+				{
+					"name": "Guardar Respuestas",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"respuestas\": [\n    {\n      \"campo_uuid\": \"{{campo_uuid_superficie}}\",\n      \"valor\": 150.5\n    },\n    {\n      \"campo_uuid\": \"{{campo_uuid_fecha_inicio}}\",\n      \"valor\": \"2025-11-25T08:00:00Z\"\n    },\n    {\n      \"campo_uuid\": \"{{campo_uuid_tipo}}\",\n      \"valor\": [\"rastrero\", \"copas\"]\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/cierre/{{incendio_uuid}}/respuestas",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cierre", "{{incendio_uuid}}", "respuestas"]
+						},
+						"description": "Guardar múltiples respuestas del formulario de cierre"
+					},
+					"response": []
+				},
+				{
+					"name": "Actualizar Respuesta",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"valor\": 200.75\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/cierre/{{incendio_uuid}}/respuestas/{{campo_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cierre", "{{incendio_uuid}}", "respuestas", "{{campo_uuid}}"]
+						},
+						"description": "Actualizar una respuesta específica"
+					},
+					"response": []
+				},
+				{
+					"name": "Eliminar Respuesta",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/cierre/{{incendio_uuid}}/respuestas/{{campo_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cierre", "{{incendio_uuid}}", "respuestas", "{{campo_uuid}}"]
+						},
+						"description": "Eliminar una respuesta específica"
+					},
+					"response": []
+				},
+				{
+					"name": "Finalizar Incendio (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"extinguido_at\": \"2025-11-25T18:00:00Z\",\n  \"observaciones\": \"Incendio completamente controlado y extinguido\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/cierre/{{incendio_uuid}}/finalizar",
+							"host": ["{{base_url}}"],
+							"path": ["api", "cierre", "{{incendio_uuid}}", "finalizar"]
+						},
+						"description": "Finalizar/extinguir un incendio - Solo admin"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Cierre Admin",
+			"item": [
+				{
+					"name": "Plantillas",
+					"item": [
+						{
+							"name": "Listar Plantillas",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/plantillas",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "plantillas"]
+								},
+								"description": "Listar todas las plantillas de cierre"
+							},
+							"response": []
+						},
+						{
+							"name": "Crear Plantilla",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 201) {",
+											"    var jsonData = pm.response.json();",
+											"    pm.environment.set('plantilla_uuid', jsonData.plantilla_uuid);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nombre\": \"Plantilla Simplificada\",\n  \"descripcion\": \"Para incendios menores\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/plantillas",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "plantillas"]
+								},
+								"description": "Crear nueva plantilla - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Obtener Plantilla",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/plantillas/{{plantilla_uuid}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "plantillas", "{{plantilla_uuid}}"]
+								},
+								"description": "Obtener plantilla con secciones y campos"
+							},
+							"response": []
+						},
+						{
+							"name": "Actualizar Plantilla",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nombre\": \"Plantilla Actualizada\",\n  \"descripcion\": \"Descripción actualizada\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/plantillas/{{plantilla_uuid}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "plantillas", "{{plantilla_uuid}}"]
+								},
+								"description": "Actualizar plantilla - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Eliminar Plantilla",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/plantillas/{{plantilla_uuid}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "plantillas", "{{plantilla_uuid}}"]
+								},
+								"description": "Eliminar plantilla - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Activar Plantilla",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/plantillas/{{plantilla_uuid}}/activar",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "plantillas", "{{plantilla_uuid}}", "activar"]
+								},
+								"description": "Activar plantilla (desactiva las demás) - Solo admin"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Secciones",
+					"item": [
+						{
+							"name": "Crear Sección",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 201) {",
+											"    var jsonData = pm.response.json();",
+											"    pm.environment.set('seccion_uuid', jsonData.seccion_uuid);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nombre\": \"Datos Básicos\",\n  \"descripcion\": \"Información esencial del incendio\",\n  \"orden\": 1,\n  \"icono\": \"info\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/plantillas/{{plantilla_uuid}}/secciones",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "plantillas", "{{plantilla_uuid}}", "secciones"]
+								},
+								"description": "Agregar sección a plantilla - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Actualizar Sección",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nombre\": \"Datos Básicos Actualizados\",\n  \"orden\": 2\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/secciones/{{seccion_uuid}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "secciones", "{{seccion_uuid}}"]
+								},
+								"description": "Actualizar sección - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Eliminar Sección",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/secciones/{{seccion_uuid}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "secciones", "{{seccion_uuid}}"]
+								},
+								"description": "Eliminar sección - Solo admin"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Campos",
+					"item": [
+						{
+							"name": "Crear Campo",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nombre\": \"Superficie afectada\",\n  \"descripcion\": \"Área total afectada por el incendio\",\n  \"tipo\": \"number\",\n  \"orden\": 1,\n  \"requerido\": true,\n  \"unidad\": \"hectáreas\",\n  \"validaciones\": {\n    \"min\": 0,\n    \"step\": 0.01\n  },\n  \"placeholder\": \"Ingrese el área en hectáreas\",\n  \"ayuda\": \"Medida aproximada del área afectada\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/secciones/{{seccion_uuid}}/campos",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "secciones", "{{seccion_uuid}}", "campos"]
+								},
+								"description": "Agregar campo a sección - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Crear Campo Select",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nombre\": \"Tipo de incendio\",\n  \"tipo\": \"select\",\n  \"orden\": 2,\n  \"requerido\": true,\n  \"opciones\": [\n    {\"value\": \"rastrero\", \"label\": \"Rastrero\"},\n    {\"value\": \"copas\", \"label\": \"De copas\"},\n    {\"value\": \"subterraneo\", \"label\": \"Subterráneo\"}\n  ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/secciones/{{seccion_uuid}}/campos",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "secciones", "{{seccion_uuid}}", "campos"]
+								},
+								"description": "Crear campo tipo select - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Actualizar Campo",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"nombre\": \"Superficie total afectada\",\n  \"requerido\": false\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/campos/{{campo_uuid}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "campos", "{{campo_uuid}}"]
+								},
+								"description": "Actualizar campo - Solo admin"
+							},
+							"response": []
+						},
+						{
+							"name": "Eliminar Campo",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/cierre-admin/campos/{{campo_uuid}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "cierre-admin", "campos", "{{campo_uuid}}"]
+								},
+								"description": "Eliminar campo - Solo admin"
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Catálogos",
+			"item": [
+				{
+					"name": "Departamentos",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/catalogos/departamentos",
+							"host": ["{{base_url}}"],
+							"path": ["api", "catalogos", "departamentos"]
+						},
+						"description": "Listar todos los departamentos"
+					},
+					"response": []
+				},
+				{
+					"name": "Municipios",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/catalogos/municipios?departamento_uuid={{departamento_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "catalogos", "municipios"],
+							"query": [
+								{
+									"key": "departamento_uuid",
+									"value": "{{departamento_uuid}}"
+								}
+							]
+						},
+						"description": "Listar municipios de un departamento"
+					},
+					"response": []
+				},
+				{
+					"name": "Medios",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/catalogos/medios",
+							"host": ["{{base_url}}"],
+							"path": ["api", "catalogos", "medios"]
+						},
+						"description": "Listar medios de reporte"
+					},
+					"response": []
+				},
+				{
+					"name": "Estados",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/catalogos/estados",
+							"host": ["{{base_url}}"],
+							"path": ["api", "catalogos", "estados"]
+						},
+						"description": "Listar estados de incendio"
+					},
+					"response": []
+				},
+				{
+					"name": "Instituciones",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/seguridad/instituciones",
+							"host": ["{{base_url}}"],
+							"path": ["api", "seguridad", "instituciones"]
+						},
+						"description": "Listar instituciones"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Usuarios",
+			"item": [
+				{
+					"name": "Listar Usuarios",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/usuarios?page=1&pageSize=10",
+							"host": ["{{base_url}}"],
+							"path": ["api", "usuarios"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "10"
+								},
+								{
+									"key": "q",
+									"value": "",
+									"description": "Buscar por nombre o email",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Listar usuarios - Solo admin"
+					},
+					"response": []
+				},
+				{
+					"name": "Obtener Usuario",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/usuarios/{{usuario_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "usuarios", "{{usuario_uuid}}"]
+						},
+						"description": "Obtener detalles de un usuario"
+					},
+					"response": []
+				},
+				{
+					"name": "Actualizar Usuario",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Juan Actualizado\",\n  \"telefono\": \"87654321\",\n  \"es_miembro_institucion\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/usuarios/{{usuario_uuid}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "usuarios", "{{usuario_uuid}}"]
+						},
+						"description": "Actualizar usuario - Admin o el mismo usuario"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Notificaciones",
+			"item": [
+				{
+					"name": "Listar Notificaciones",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notificaciones?page=1&pageSize=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "notificaciones"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "pageSize",
+									"value": "20"
+								},
+								{
+									"key": "leida",
+									"value": "false",
+									"description": "Filtrar por leídas/no leídas",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Listar notificaciones del usuario"
+					},
+					"response": []
+				},
+				{
+					"name": "Marcar como Leída",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/notificaciones/{{notificacion_uuid}}/leer",
+							"host": ["{{base_url}}"],
+							"path": ["api", "notificaciones", "{{notificacion_uuid}}", "leer"]
+						},
+						"description": "Marcar notificación como leída"
+					},
+					"response": []
+				},
+				{
+					"name": "Registrar Token Push",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\",\n  \"departamentos_suscritos\": [\"{{departamento_uuid}}\"],\n  \"municipios_suscritos\": [],\n  \"avisarme_aprobado\": true,\n  \"avisarme_actualizaciones\": true,\n  \"avisarme_cierres\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/notifications/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "notifications", "register"]
+						},
+						"description": "Registrar token de notificaciones push"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Liveness",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health/liveness",
+							"host": ["{{base_url}}"],
+							"path": ["health", "liveness"]
+						},
+						"description": "Verificar que la API está viva"
+					},
+					"response": []
+				},
+				{
+					"name": "Readiness",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health/readiness",
+							"host": ["{{base_url}}"],
+							"path": ["health", "readiness"]
+						},
+						"description": "Verificar que la API está lista (BD, Redis, etc.)"
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
