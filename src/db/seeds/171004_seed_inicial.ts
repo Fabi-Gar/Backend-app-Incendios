@@ -59,43 +59,8 @@ async function main() {
       'Bomberos Voluntarios','Bomberos Municipales','Ejército de Guatemala'
     ])
 
-    // ===== CATÁLOGOS de cierre y soporte (todos por nombre)
-    await upsertByNombre(q, 'tipos_incendio', ['Rastrero','De copas','Subterráneo'])
-
-    await upsertByNombre(q, 'tipo_propiedad', [
-      'Privada','Pública','Comunal','Ejidal','Área protegida','Derecho de vía'
-    ])
-
-    await upsertByNombre(q, 'causas_catalogo', [
-      'Quema agrícola','Fogata','Colilla de cigarro','Quema de basura',
-      'Quema pecuaria','Rayo','Intencional','Desconocida'
-    ])
-
-    await upsertByNombre(q, 'iniciado_junto_a_catalogo', [
-      'Carretera','Cultivo','Basurero','Vivienda','Área boscosa',
-      'Tendido eléctrico','Riberas/Quebradas'
-    ])
-
-    await upsertByNombre(q, 'medios_aereos_catalogo', [
-      'Avión de sobrevuelo','Avión cisterna','Helicóptero con helibalde','Helicóptero de monitoreo'
-    ])
-
-    await upsertByNombre(q, 'medios_terrestres_catalogo', [
-      'Pick-up','Camión','Ambulancia','Microbús','Motobomba','Cisterna','Motocicleta','Vehículo de rescate'
-    ])
-
-    await upsertByNombre(q, 'medios_acuaticos_catalogo', ['Lancha','Otro'])
-
-    await upsertByNombre(q, 'abastos_catalogo', [
-      'Raciones frías','Incaparina','Agua','Raciones calientes'
-    ])
-
-    // (Opcional) Si algún día agregas este catálogo, quedará poblado automáticamente:
-    await upsertByNombre(q, 'tecnicas_extincion_catalogo', [
-      'Ataque directo','Ataque indirecto','Control natural'
-    ])
-
-const hasDepartamentos = await tableExists(q, 'departamentos')
+    // ===== DEPARTAMENTOS Y MUNICIPIOS
+    const hasDepartamentos = await tableExists(q, 'departamentos')
 const hasMunicipios = await tableExists(q, 'municipios')
 if (hasDepartamentos && hasMunicipios) {
   // Inserta el departamento si no existe
@@ -175,7 +140,7 @@ if (hasDepartamentos && hasMunicipios) {
     `)
 
     await q.commitTransaction()
-    console.log('Seed OK ✅ (roles, estados, medios, instituciones, catálogos, Huehuetenango y admin)')
+    console.log('Seed OK ✅ (roles, estados, medios, instituciones, Huehuetenango y admin)')
   } catch (e) {
     await q.rollbackTransaction()
     console.error('Seed FAILED', e)

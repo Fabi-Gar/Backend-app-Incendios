@@ -13,7 +13,7 @@ import { notifyIncendioCerrado } from '../notificaciones/incendioNotify.service'
 import { notifyCierreEvento } from '../notificaciones/cierreNotify.service'
 import { Notificacion } from '../notificaciones/entities/notificacion.entity'
 import { getSubscribedUsers } from '../incendios/GetsuscribedUsers'
-import { IsNull } from 'typeorm'
+import { IsNull, In } from 'typeorm'
 import { sendError, ErrorHelpers } from '../../utils/response'
 import { loggers } from '../../utils/logger'
 import { loadIncendio, IncendioBasicData } from '../../middlewares/load-incendio'
@@ -554,6 +554,114 @@ router.post('/:incendio_uuid/finalizar', async (req, res, next) => {
     return res.json({ ok: true, extinguido_at })
   } catch (e: any) {
     if (e?.issues) return ErrorHelpers.badRequest(res, 'Datos de entrada inválidos')
+    next(e)
+  }
+})
+
+// GET /estados - Obtener estados calculados por porcentaje de completitud (batch)
+router.get('/estados', async (req, res, next) => {
+  try {
+    const { ids } = z.object({ ids: z.string() }).parse(req.query)
+    const incendioUuids = ids.split(',').filter(Boolean)
+
+    if (!incendioUuids.length) {
+      return res.json({ byId: {} })
+    }
+
+    // Obtener la plantilla activa
+    const plantilla = await AppDataSource.getRepository(CierrePlantilla).findOne({
+      where: { activa: true, eliminado_en: IsNull() }
+    })
+
+    if (!plantilla) {
+      // Si no hay plantilla, devolver "Reportado" para todos
+      const byId: Record<string, { estado: string; porcentaje: number; extinguido: boolean }> = {}
+      for (const id of incendioUuids) {
+        byId[id] = { estado: 'Reportado', porcentaje: 0, extinguido: false }
+      }
+      return res.json({ byId })
+    }
+
+    // Obtener todos los campos de la plantilla
+    const secciones = await AppDataSource.getRepository(CierreSeccion).find({
+      where: { plantilla_uuid: plantilla.plantilla_uuid, eliminado_en: IsNull() }
+    })
+
+    const seccionUuids = secciones.map(s => s.seccion_uuid)
+    const todosCampos = await AppDataSource.getRepository(CierreCampo).find({
+      where: { seccion_uuid: In(seccionUuids), eliminado_en: IsNull() }
+    })
+
+    const totalCampos = todosCampos.length
+
+    if (totalCampos === 0) {
+      // No hay campos, devolver "Reportado" para todos
+      const byId: Record<string, { estado: string; porcentaje: number; extinguido: boolean }> = {}
+      for (const id of incendioUuids) {
+        byId[id] = { estado: 'Reportado', porcentaje: 0, extinguido: false }
+      }
+      return res.json({ byId })
+    }
+
+    const byId: Record<string, { estado: string; porcentaje: number; extinguido: boolean }> = {}
+
+    // Procesar cada incendio
+    for (const incendio_uuid of incendioUuids) {
+      // Verificar si existe el incendio y si está extinguido
+      const incendio = await AppDataSource.getRepository(Incendio).findOne({
+        where: { incendio_uuid, eliminado_en: IsNull() }
+      })
+
+      if (!incendio) {
+        byId[incendio_uuid] = { estado: 'Reportado', porcentaje: 0, extinguido: false }
+        continue
+      }
+
+      const extinguido = !!(incendio as any).extinguido_at
+
+      // Contar respuestas completadas
+      const respuestas = await AppDataSource.getRepository(CierreRespuesta).find({
+        where: {
+          incendio_uuid,
+          campo_uuid: In(todosCampos.map(c => c.campo_uuid)),
+          eliminado_en: IsNull()
+        }
+      })
+
+      // Contar solo respuestas con contenido válido
+      const respuestasCompletadas = respuestas.filter(r => {
+        return (
+          (r.valor_texto && r.valor_texto.trim() !== '') ||
+          r.valor_numero !== null ||
+          r.valor_fecha !== null ||
+          r.valor_datetime !== null ||
+          r.valor_boolean !== null ||
+          r.valor_json !== null
+        )
+      }).length
+
+      const porcentaje = Math.round((respuestasCompletadas / totalCampos) * 100)
+
+      // Calcular estado basado en porcentaje y si está extinguido
+      let estado: string
+      if (extinguido) {
+        estado = 'Extinguido'
+      } else if (porcentaje >= 95) {
+        estado = 'Controlado'
+      } else if (porcentaje >= 80) {
+        estado = 'Controlando'
+      } else if (porcentaje >= 25) {
+        estado = 'En atención'
+      } else {
+        estado = 'Reportado'
+      }
+
+      byId[incendio_uuid] = { estado, porcentaje, extinguido }
+    }
+
+    return res.json({ byId })
+  } catch (e: any) {
+    if (e?.issues) return ErrorHelpers.badRequest(res, 'Parámetros inválidos')
     next(e)
   }
 })

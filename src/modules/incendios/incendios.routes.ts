@@ -5,7 +5,7 @@ import { AppDataSource } from '../../db/data-source'
 import { Incendio } from './entities/incendio.entity'
 import { Usuario } from '../seguridad/entities/usuario.entity'
 import { FindOptionsWhere, ILike, IsNull, Between } from 'typeorm'
-import { guardAuth, guardAdmin } from '../../middlewares/auth'
+import { guardAuth, guardAdmin, guardAdminOrInstitucion } from '../../middlewares/auth'
 import multer from 'multer'
 import { 
   notifyIncendioAprobado,
@@ -201,7 +201,7 @@ const updateIncendioSchema = z.object({
   estado_incendio_uuid: z.string().uuid().optional(), // <-- sin nullish
 })
 
-router.get('/sin-aprobar', guardAdmin, async (req, res, next) => {
+router.get('/sin-aprobar', guardAuth, guardAdminOrInstitucion, async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim();
     const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1);
@@ -644,7 +644,7 @@ router.patch('/:uuid', guardAuth, async (req, res, next) => {
 
 // -------------------- APROBAR --------------------
 // En incendios.routes.ts - endpoint PATCH /:uuid/aprobar
-router.patch('/:uuid/aprobar', guardAuth, guardAdmin, async (req, res, next) => {
+router.patch('/:uuid/aprobar', guardAuth, guardAdminOrInstitucion, async (req, res, next) => {
   try {
     const { uuid } = z.object({ uuid: z.string().uuid() }).parse(req.params)
     const repo = AppDataSource.getRepository(Incendio)
@@ -736,7 +736,7 @@ router.patch('/:uuid/aprobar', guardAuth, guardAdmin, async (req, res, next) => 
 })
 
 // -------------------- RECHAZAR --------------------
-router.patch('/:uuid/rechazar', guardAuth, guardAdmin, async (req, res, next) => {
+router.patch('/:uuid/rechazar', guardAuth, guardAdminOrInstitucion, async (req, res, next) => {
   try {
     const { uuid } = z.object({ uuid: z.string().uuid() }).parse(req.params)
     const { motivo_rechazo } = z.object({ motivo_rechazo: z.string().min(1) }).parse(req.body)

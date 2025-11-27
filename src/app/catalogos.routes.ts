@@ -8,15 +8,6 @@ const router = Router()
 const CATALOGS: Record<string, { table: string, id: string }> = {
   medios: { table: 'medios', id: 'medio_uuid' },
   instituciones: { table: 'instituciones', id: 'institucion_uuid' },
-  tipos_incendio: { table: 'tipos_incendio', id: 'tipo_incendio_id' },
-  tipo_propiedad: { table: 'tipo_propiedad', id: 'tipo_propiedad_id' },
-  causas_catalogo: { table: 'causas_catalogo', id: 'causa_id' },
-  iniciado_junto_a_catalogo: { table: 'iniciado_junto_a_catalogo', id: 'iniciado_id' },
-  medios_aereos_catalogo: { table: 'medios_aereos_catalogo', id: 'medio_aereo_id' },
-  medios_terrestres_catalogo: { table: 'medios_terrestres_catalogo', id: 'medio_terrestre_id' },
-  medios_acuaticos_catalogo: { table: 'medios_acuaticos_catalogo', id: 'medio_acuatico_id' },
-  abastos_catalogo: { table: 'abastos_catalogo', id: 'abasto_id' },
-  tecnicas_extincion_catalogo: { table: 'tecnicas_extincion_catalogo', id: 'tecnica_id' },
   roles: { table: 'roles', id: 'rol_uuid' },
 }
 

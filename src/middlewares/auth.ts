@@ -112,3 +112,14 @@ export function guardAdmin(_req: Request, res: Response, next: NextFunction) {
     })
   next()
 }
+
+// Admin o miembro de institución
+export function guardAdminOrInstitucion(_req: Request, res: Response, next: NextFunction) {
+  const u = res.locals.ctx?.user as Usuario | (Usuario & { is_admin?: boolean; es_miembro_institucion?: boolean }) | null
+  if (!u?.is_admin && !u?.es_miembro_institucion)
+    return res.status(403).json({
+      error: { code: 'FORBIDDEN', message: 'Requiere permisos de admin o miembro de institución' },
+      requestId: res.locals.ctx?.requestId,
+    })
+  next()
+}
