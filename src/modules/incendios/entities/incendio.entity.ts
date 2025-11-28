@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn, Index, OneToOne } from 'typeorm'
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn, Index, OneToOne, OneToMany } from 'typeorm'
 import { Usuario } from '../../seguridad/entities/usuario.entity'
 import { EstadoIncendio } from '../../catalogos/entities/estado-incendio.entity'
 import { InfoFalsaIncendio } from '../../responsable/entities/info-falsa-incendio.entity'
@@ -6,6 +6,7 @@ import { Institucion } from '../../seguridad/entities/institucion.entity'
 import { Medio } from '../../catalogos/entities/medio.entity'
 import { Departamento } from '../../catalogos/entities/departamento.entity'
 import { Municipio } from '../../catalogos/entities/municipio.entity'
+import { IncendioSeguidor } from './incendio-seguidor.entity'
 
 @Index('idx_incendios_estado_aprobado', ['estado_incendio', 'aprobado'])
 @Index('idx_incendios_reportado_en', ['reportado_en'])
@@ -15,6 +16,9 @@ import { Municipio } from '../../catalogos/entities/municipio.entity'
 export class Incendio {
   @PrimaryGeneratedColumn('uuid', { name: 'incendio_uuid' })
   incendio_uuid!: string
+
+  @OneToMany(() => IncendioSeguidor, (seguidor) => seguidor.incendio)
+  seguidores!: IncendioSeguidor[]
 
   @ManyToOne(() => Usuario, { nullable: false })
   @JoinColumn({ name: 'creado_por_uuid', referencedColumnName: 'usuario_uuid', foreignKeyConstraintName: 'fk_incendios_creado_por_uuid' })

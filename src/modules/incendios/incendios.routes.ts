@@ -17,6 +17,7 @@ import { Notificacion } from '../notificaciones/entities/notificacion.entity'
 import { auditRecord } from '../auditoria/auditoria.service'
 import { EstadoIncendio } from '../catalogos/entities/estado-incendio.entity'
 import { IncendioEstadoHistorial } from './entities/incendio-estado-historial.entity'
+import { IncendioSeguidor } from './entities/incendio-seguidor.entity'
 import fs from 'fs/promises'
 import path from 'path'
 import mime from 'mime-types'
@@ -201,6 +202,97 @@ const updateIncendioSchema = z.object({
   estado_incendio_uuid: z.string().uuid().optional(), // <-- sin nullish
 })
 
+// -------------------- MIS INCENDIOS --------------------
+router.get('/mios', guardAuth, async (req, res, next) => {
+  try {
+    const user = res.locals?.ctx?.user as Usuario | undefined
+    if (!user?.usuario_uuid) {
+      return res.status(401).json({ error: { code: 'UNAUTHENTICATED' } })
+    }
+
+    const q = String(req.query.q || '').trim()
+    const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1)
+    const pageSize = Math.min(Math.max(parseInt(String(req.query.pageSize || '20'), 10) || 20, 1), 100)
+
+    // Total
+    const totalRows = await AppDataSource.query(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM incendios i
+      WHERE i.eliminado_en IS NULL
+        AND (i.creado_por_uuid = $1 OR i.reportado_por_uuid = $1)
+        AND ($2 = '' OR i.titulo ILIKE '%' || $2 || '%')
+      `,
+      [user.usuario_uuid, q]
+    )
+    const total = totalRows?.[0]?.total ?? 0
+
+    // Items
+    const items = await AppDataSource.query(
+      `
+      SELECT
+        i.incendio_uuid,
+        i.titulo,
+        i.descripcion,
+        i.centroide,
+        i.creado_en,
+        i.requiere_aprobacion,
+        i.aprobado,
+        i.aprobado_en,
+        i.rechazado_en,
+        i.motivo_rechazo,
+        i.reportado_en,
+        i.reportado_por_nombre,
+        i.telefono,
+        i.lugar_poblado,
+        jsonb_build_object(
+          'usuario_uuid', u.usuario_uuid,
+          'nombre', u.nombre,
+          'apellido', u.apellido,
+          'email', u.email
+        ) AS creado_por,
+        CASE
+          WHEN d.nombre IS NOT NULL THEN
+            jsonb_build_object(
+              'departamento_uuid', d.departamento_uuid,
+              'nombre', d.nombre
+            )
+          ELSE NULL
+        END AS departamento,
+        CASE
+          WHEN m.nombre IS NOT NULL THEN
+            jsonb_build_object(
+              'municipio_uuid', m.municipio_uuid,
+              'nombre', m.nombre
+            )
+          ELSE NULL
+        END AS municipio,
+        CASE
+          WHEN med.nombre IS NOT NULL THEN
+            jsonb_build_object(
+              'medio_uuid', med.medio_uuid,
+              'nombre', med.nombre
+            )
+          ELSE NULL
+        END AS medio
+      FROM incendios i
+      LEFT JOIN usuarios u ON u.usuario_uuid = i.creado_por_uuid
+      LEFT JOIN departamentos d ON d.departamento_uuid = i.departamento_uuid
+      LEFT JOIN municipios m ON m.municipio_uuid = i.municipio_uuid
+      LEFT JOIN catalogo_medios med ON med.medio_uuid = i.medio_uuid
+      WHERE i.eliminado_en IS NULL
+        AND (i.creado_por_uuid = $1 OR i.reportado_por_uuid = $1)
+        AND ($2 = '' OR i.titulo ILIKE '%' || $2 || '%')
+      ORDER BY i.creado_en DESC
+      LIMIT $3 OFFSET $4
+      `,
+      [user.usuario_uuid, q, pageSize, (page - 1) * pageSize]
+    )
+
+    res.json({ total, page, pageSize, items })
+  } catch (err) { next(err) }
+})
+
 router.get('/sin-aprobar', guardAuth, guardAdminOrInstitucion, async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim();
@@ -307,10 +399,18 @@ router.get('/:uuid', async (req, res, next) => {
     const repo = AppDataSource.getRepository(Incendio)
     const item = await repo.findOne({
       where: { incendio_uuid: uuid, eliminado_en: IsNull() },
-      relations: { creado_por: true }
+      relations: {
+        creado_por: true,
+        reportado_por: true,
+        institucion_reporte: true,
+        medio: true,
+        departamento: true,
+        municipio: true,
+        estado_incendio: true,
+      }
     })
-    const u = res.locals?.ctx?.user
-    const puedeVer = item && (item.aprobado || (u?.is_admin || u?.usuario_uuid === (item as any).creado_por_uuid))
+    const u = res.locals.ctx.user
+    const puedeVer = item && (item.aprobado || (u?.is_admin || u?.usuario_uuid === item.creado_por?.usuario_uuid))
     if (!item || !puedeVer) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Incendio no disponible' }, requestId: res.locals.ctx?.requestId })
     }
@@ -369,6 +469,9 @@ router.post('/', guardAuth, upload.single('file'), async (req, res, next) => {
       (user as any)?.email ||
       'Usuario'
 
+    // Si no viene teléfono en el body, usar el del usuario
+    const telefonoReporte = body.telefono ?? (user as any)?.telefono ?? null
+
     const result = await AppDataSource.transaction(async (trx) => {
       const incRepo = trx.getRepository(Incendio)
 
@@ -386,7 +489,7 @@ router.post('/', guardAuth, upload.single('file'), async (req, res, next) => {
         reportado_por: { usuario_uuid: user.usuario_uuid } as any,
         reportado_por_nombre: reportanteNombre,
         institucion_reporte: institucionReporteUuid ? { institucion_uuid: institucionReporteUuid } as any : null,
-        telefono: body.telefono ?? null,
+        telefono: telefonoReporte,
         reportado_en: body.reportado_en ?? new Date(),
         medio: body.medio_uuid ? { medio_uuid: body.medio_uuid } as any : null,
         departamento: body.departamento_uuid ? { departamento_uuid: body.departamento_uuid } as any : null,
@@ -768,5 +871,109 @@ router.patch('/:uuid/rechazar', guardAuth, guardAdminOrInstitucion, async (req, 
     next(err)
   }
 })
+
+// -------------------- HISTORIAL DE ESTADOS --------------------
+router.get('/:uuid/historial', async (req, res, next) => {
+  try {
+    const { uuid } = z.object({ uuid: z.string().uuid() }).parse(req.params)
+
+    const historial = await AppDataSource.query(
+      `
+      SELECT
+        h.historial_uuid,
+        h.observacion,
+        h.creado_en,
+        jsonb_build_object(
+          'estado_incendio_uuid', e.estado_incendio_uuid,
+          'codigo', e.codigo,
+          'nombre', e.nombre,
+          'orden', e.orden
+        ) AS estado,
+        CASE
+          WHEN u.usuario_uuid IS NOT NULL THEN
+            jsonb_build_object(
+              'usuario_uuid', u.usuario_uuid,
+              'nombre', u.nombre,
+              'apellido', u.apellido,
+              'email', u.email
+            )
+          ELSE NULL
+        END AS cambiado_por
+      FROM incendio_estado_historial h
+      LEFT JOIN estado_incendio e ON e.estado_incendio_uuid = h.estado_incendio_uuid
+      LEFT JOIN usuarios u ON u.usuario_uuid = h.cambiado_por_uuid
+      WHERE h.incendio_uuid = $1 AND h.eliminado_en IS NULL
+      ORDER BY h.creado_en DESC
+      `,
+      [uuid]
+    )
+
+    res.json({ total: historial.length, items: historial })
+  } catch (err: any) {
+    if (err?.issues) return res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Validación', issues: err.issues }, requestId: res.locals.ctx?.requestId })
+    next(err)
+  }
+})
+
+// -------------------- SEGUIMIENTO DE INCENDIOS --------------------
+
+// Verificar si el usuario actual sigue un incendio
+router.get('/:uuid/siguiendo', guardAuth, async (req, res, next) => {
+  try {
+    const { uuid } = z.object({ uuid: z.string().uuid() }).parse(req.params);
+    const user = res.locals.ctx.user as Usuario;
+
+    const repo = AppDataSource.getRepository(IncendioSeguidor);
+    const seguimiento = await repo.findOne({
+      where: {
+        incendio_uuid: uuid,
+        usuario_uuid: user.usuario_uuid,
+      },
+    });
+
+    res.json({ siguiendo: !!seguimiento });
+  } catch (err: any) {
+    if (err?.issues) return res.status(400).json({ error: { code: 'BAD_REQUEST', issues: err.issues } });
+    next(err);
+  }
+});
+
+// Seguir un incendio
+router.post('/:uuid/seguir', guardAuth, async (req, res, next) => {
+  try {
+    const { uuid } = z.object({ uuid: z.string().uuid() }).parse(req.params);
+    const user = res.locals.ctx.user as Usuario;
+
+    const repo = AppDataSource.getRepository(IncendioSeguidor);
+    await repo.save({
+      incendio_uuid: uuid,
+      usuario_uuid: user.usuario_uuid,
+    });
+
+    res.status(201).json({ message: 'Ahora sigues este incendio.' });
+  } catch (err: any) {
+    if (err?.issues) return res.status(400).json({ error: { code: 'BAD_REQUEST', issues: err.issues } });
+    next(err);
+  }
+});
+
+// Dejar de seguir un incendio
+router.delete('/:uuid/seguir', guardAuth, async (req, res, next) => {
+  try {
+    const { uuid } = z.object({ uuid: z.string().uuid() }).parse(req.params);
+    const user = res.locals.ctx.user as Usuario;
+
+    const repo = AppDataSource.getRepository(IncendioSeguidor);
+    await repo.delete({
+      incendio_uuid: uuid,
+      usuario_uuid: user.usuario_uuid,
+    });
+
+    res.status(200).json({ message: 'Dejaste de seguir este incendio.' });
+  } catch (err: any) {
+    if (err?.issues) return res.status(400).json({ error: { code: 'BAD_REQUEST', issues: err.issues } });
+    next(err);
+  }
+});
 
 export default router

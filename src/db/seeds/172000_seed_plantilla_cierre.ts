@@ -138,8 +138,12 @@ async function main() {
     await q.query(
       `INSERT INTO cierre_campos (seccion_uuid, nombre, descripcion, tipo, orden, requerido, opciones)
        VALUES
-       ($1, 'Tipo de incendio', 'Clasificación del tipo de incendio', 'multiselect', 1, true,
-        '[{"value":"rastrero","label":"Rastrero"},{"value":"copas","label":"De copas"},{"value":"subterraneo","label":"Subterráneo"}]'::jsonb),
+       ($1, 'Tipo de incendio', 'Clasificación del tipo de incendio (puede seleccionar múltiples tipos con porcentaje)', 'multiselect', 1, true,
+        '[
+          {"value":"rastrero","label":"Rastrero (fuego superficial)","requiresPercentage":true,"percentageLabel":"% del área"},
+          {"value":"copas","label":"De copas (fuego aéreo)","requiresPercentage":true,"percentageLabel":"% del área"},
+          {"value":"subterraneo","label":"Subterráneo (fuego de suelo)","requiresPercentage":true,"percentageLabel":"% del área"}
+        ]'::jsonb),
        ($1, 'Intensidad', 'Nivel de intensidad del incendio', 'select', 2, false,
         '[{"value":"baja","label":"Baja"},{"value":"media","label":"Media"},{"value":"alta","label":"Alta"}]'::jsonb)`,
       [secciones.composicion]
@@ -245,32 +249,50 @@ async function main() {
     )
     campoCount += 1
 
-    // Medios terrestres
+    // Medios terrestres (con cantidad)
     await q.query(
       `INSERT INTO cierre_campos (seccion_uuid, nombre, descripcion, tipo, orden, requerido, opciones)
        VALUES
-       ($1, 'Medios terrestres', 'Vehículos y equipos terrestres', 'multiselect', 3, false,
-        '[{"value":"pickup","label":"Pick-up"},{"value":"camion","label":"Camión"},{"value":"ambulancia","label":"Ambulancia"},{"value":"microbus","label":"Microbús"},{"value":"motobomba","label":"Motobomba"},{"value":"cisterna","label":"Cisterna"},{"value":"motocicleta","label":"Motocicleta"},{"value":"rescate","label":"Vehículo de rescate"}]'::jsonb)`,
+       ($1, 'Medios terrestres', 'Vehículos y equipos terrestres utilizados', 'multiselect', 3, false,
+        '[
+          {"value":"pickup","label":"Pick-up","requiresQuantity":true,"quantityLabel":"Cantidad de pick-ups"},
+          {"value":"camion","label":"Camión","requiresQuantity":true,"quantityLabel":"Cantidad de camiones"},
+          {"value":"ambulancia","label":"Ambulancia","requiresQuantity":true,"quantityLabel":"Cantidad de ambulancias"},
+          {"value":"microbus","label":"Microbús","requiresQuantity":true,"quantityLabel":"Cantidad de microbuses"},
+          {"value":"motobomba","label":"Motobomba","requiresQuantity":true,"quantityLabel":"Cantidad de motobombas"},
+          {"value":"cisterna","label":"Cisterna","requiresQuantity":true,"quantityLabel":"Cantidad de cisternas"},
+          {"value":"motocicleta","label":"Motocicleta","requiresQuantity":true,"quantityLabel":"Cantidad de motocicletas"},
+          {"value":"rescate","label":"Vehículo de rescate","requiresQuantity":true,"quantityLabel":"Cantidad de vehículos"}
+        ]'::jsonb)`,
       [secciones.recursos]
     )
     campoCount += 1
 
-    // Medios aéreos
+    // Medios aéreos (con cantidad)
     await q.query(
       `INSERT INTO cierre_campos (seccion_uuid, nombre, descripcion, tipo, orden, requerido, opciones)
        VALUES
        ($1, 'Medios aéreos', 'Aeronaves utilizadas', 'multiselect', 4, false,
-        '[{"value":"avion_sobrevuelo","label":"Avión de sobrevuelo"},{"value":"avion_cisterna","label":"Avión cisterna"},{"value":"helicoptero_helibalde","label":"Helicóptero con helibalde"},{"value":"helicoptero_monitoreo","label":"Helicóptero de monitoreo"}]'::jsonb)`,
+        '[
+          {"value":"avion_sobrevuelo","label":"Avión de sobrevuelo","requiresQuantity":true,"quantityLabel":"Cantidad de aviones"},
+          {"value":"avion_cisterna","label":"Avión cisterna","requiresQuantity":true,"quantityLabel":"Cantidad de aviones"},
+          {"value":"helicoptero_helibalde","label":"Helicóptero con helibalde","requiresQuantity":true,"quantityLabel":"Cantidad de helicópteros"},
+          {"value":"helicoptero_monitoreo","label":"Helicóptero de monitoreo","requiresQuantity":true,"quantityLabel":"Cantidad de helicópteros"}
+        ]'::jsonb)`,
       [secciones.recursos]
     )
     campoCount += 1
 
-    // Medios acuáticos
+    // Medios acuáticos (con cantidad)
     await q.query(
       `INSERT INTO cierre_campos (seccion_uuid, nombre, descripcion, tipo, orden, requerido, opciones)
        VALUES
        ($1, 'Medios acuáticos', 'Embarcaciones utilizadas', 'multiselect', 5, false,
-        '[{"value":"lancha","label":"Lancha"},{"value":"otro","label":"Otro"}]'::jsonb)`,
+        '[
+          {"value":"lancha","label":"Lancha","requiresQuantity":true,"quantityLabel":"Cantidad de lanchas"},
+          {"value":"bote","label":"Bote","requiresQuantity":true,"quantityLabel":"Cantidad de botes"},
+          {"value":"otro","label":"Otro","requiresQuantity":true,"quantityLabel":"Cantidad"}
+        ]'::jsonb)`,
       [secciones.recursos]
     )
     campoCount += 1

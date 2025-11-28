@@ -17,7 +17,8 @@
       "Bash(del LeyendaDrawer.tsx IncendioDetailsTabs.tsx)",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc19hZG1pbiI6dHJ1ZSwicm9sX3V1aWQiOiIyZTlhMWQ5My03NTA5LTQ3MjctYmUwMi03ZWNmMjI5MjEzZjUiLCJpbnN0aXR1Y2lvbl91dWlkIjoiYTY0YzhmMjYtNWY5MC00OWJjLTk3MDgtOTYxNWZmMjBkMjM0IiwiZW1haWwiOiJhZG1pbkBkZW1vLmxvY2FsIiwibm9tYnJlIjoiQWRtaW4gUHJpbmNpcGFsIiwiaWF0IjoxNzY0MjYzNTI1LCJleHAiOjE3OTU3OTk1MjUsImF1ZCI6InVzdWFyaW9zLWFwcCIsImlzcyI6ImFwcC1pbmNlbmRpb3MiLCJzdWIiOiI1MzhkYjdlZi0xZTVjLTRjMmItYmI4Yi1lNDgyYTAzMWRkMWQifQ.MJ9q2mEfe5YDeKPptriHYdRPzV4KiO7gQYnV1jj7DUU\")",
       "Bash(cat:*)",
-      "Bash(npx expo start:*)"
+      "Bash(npx expo start:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []
