@@ -1,6 +1,6 @@
 // src/modules/notificaciones/cierreNotify.service.ts
 import { PushPrefsRepo } from './pushPrefs.repo';
-import { sendFCMPush } from './fcmPush.service';
+import { sendExpoPush } from './expoPush.service';
 import type { CierreUpdateType } from './push.types';
 import { loggers } from '../../utils/logger';
 
@@ -72,7 +72,7 @@ export async function notifyCierreEvento(params: {
   }, 'Enviando notificación de cierre');
 
   // ✅ Usar FCM en lugar de Expo
-  await sendFCMPush(tokens, {
+  await sendExpoPush(tokens, {
     title: titles[type],
     body,
     data: {
@@ -100,7 +100,7 @@ export async function notifyCierreFinalizadoARegion(params: {
   loggers.notificacion.info({ tokens: tokens.length }, 'Enviando notificación regional');
   
   // ✅ Usar FCM en lugar de Expo
-  await sendFCMPush(tokens, {
+  await sendExpoPush(tokens, {
     title: '✅ Incendio finalizado en tu zona',
     body: params.incendio.titulo || 'Toca para ver detalles',
     data: {

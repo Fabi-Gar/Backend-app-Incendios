@@ -129,7 +129,8 @@ if (hasDepartamentos && hasMunicipios) {
   }
 }
 
-    // ===== ADMIN por defecto (requiere pgcrypto en migraciones)
+    // ===== ADMIN por defecto (requiere pgcrypto)
+    await q.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`)
     await q.query(`
       WITH r AS (SELECT rol_uuid FROM roles WHERE nombre='ADMIN'),
            i AS (SELECT institucion_uuid FROM instituciones WHERE nombre='CONRED')
@@ -138,6 +139,83 @@ if (hasDepartamentos && hasMunicipios) {
              r.rol_uuid, i.institucion_uuid, true
       FROM r, i
       WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE email='admin@demo.local');
+    `)
+
+    // ===== INCENDIOS FICTICIOS PARA EL LISTADO "SIN APROBAR"
+    await q.query(`DELETE FROM incendios;`)
+
+    await q.query(`
+      WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
+           e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='REPORTADO' LIMIT 1),
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Huehuetenango' LIMIT 1)
+      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre, inab_objectid, inab_tipo_incendio, inab_institucion, inab_departamento, inab_municipio, inab_fecha_hora)
+      SELECT 'Incendio forestal cerro Cruz Quemada', 'Se reporta una gran columna de humo visible desde la carretera', ST_SetSRID(ST_MakePoint(-91.472, 15.319), 4326), true, false, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Vecino Anónimo', 1001, 'Forestal', 'INAB', 'Huehuetenango', 'Huehuetenango', NOW()
+      FROM u, e, m
+      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio forestal cerro Cruz Quemada');
+    `)
+
+    await q.query(`
+      WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
+           e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='REPORTADO' LIMIT 1),
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Chiantla' LIMIT 1)
+      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre)
+      SELECT 'Incendio cerca de Los Cuchumatanes', 'El fuego avanza rápidamente hacia la parte boscosa', ST_SetSRID(ST_MakePoint(-91.45, 15.35), 4326), true, false, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Guardabosques local'
+      FROM u, e, m
+      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio cerca de Los Cuchumatanes');
+    `)
+
+    // ===== INCENDIOS FICTICIOS APROBADOS (PARA EL MAPA)
+    await q.query(`
+      WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
+           e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='ACTIVO' LIMIT 1),
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Huehuetenango' LIMIT 1)
+      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, aprobado_en, aprobado_por, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre, inab_objectid, inab_tipo_incendio, inab_institucion, inab_departamento, inab_municipio, inab_estado_aviso, inab_fecha_hora)
+      SELECT 'Incendio Finca El Peñasco', 'Incendio forestal activo, brigadas de CONRED en camino', ST_SetSRID(ST_MakePoint(-91.46, 15.30), 4326), false, true, NOW(), u.usuario_uuid, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Reporte Ciudadano', 1002, 'Estructural', 'Bomberos Voluntarios', 'Huehuetenango', 'Huehuetenango', 'Confirmado', NOW()
+      FROM u, e, m
+      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio Finca El Peñasco');
+    `)
+
+    await q.query(`
+      WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
+           e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='ACTIVO' LIMIT 1),
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Malacatancito' LIMIT 1)
+      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, aprobado_en, aprobado_por, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre)
+      SELECT 'Incendio en la cuenca del río', 'Fuego afecta áreas cercanas al río, riesgo para cultivos', ST_SetSRID(ST_MakePoint(-91.50, 15.25), 4326), false, true, NOW(), u.usuario_uuid, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Bomberos Voluntarios'
+      FROM u, e, m
+      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio en la cuenca del río');
+    `)
+
+    // ===== FOTOS PARA LOS INCENDIOS =====
+    await q.query(`
+      INSERT INTO fotos_reporte (incendio_uuid, url, credito)
+      SELECT i.incendio_uuid, 'https://images.unsplash.com/photo-1602979607519-5eb42322cb00?auto=format&fit=crop&w=800&q=80', 'Unsplash'
+      FROM incendios i
+      WHERE i.titulo = 'Incendio forestal cerro Cruz Quemada'
+      AND NOT EXISTS (SELECT 1 FROM fotos_reporte f WHERE f.incendio_uuid = i.incendio_uuid);
+    `)
+
+    await q.query(`
+      INSERT INTO fotos_reporte (incendio_uuid, url, credito)
+      SELECT i.incendio_uuid, 'https://images.unsplash.com/photo-1596788068800-4786bc67e231?auto=format&fit=crop&w=800&q=80', 'Unsplash'
+      FROM incendios i
+      WHERE i.titulo = 'Incendio cerca de Los Cuchumatanes'
+      AND NOT EXISTS (SELECT 1 FROM fotos_reporte f WHERE f.incendio_uuid = i.incendio_uuid);
+    `)
+
+    await q.query(`
+      INSERT INTO fotos_reporte (incendio_uuid, url, credito)
+      SELECT i.incendio_uuid, 'https://images.unsplash.com/photo-1542614488-82ab8706d859?auto=format&fit=crop&w=800&q=80', 'Unsplash'
+      FROM incendios i
+      WHERE i.titulo = 'Incendio Finca El Peñasco'
+      AND NOT EXISTS (SELECT 1 FROM fotos_reporte f WHERE f.incendio_uuid = i.incendio_uuid);
+    `)
+
+    await q.query(`
+      INSERT INTO fotos_reporte (incendio_uuid, url, credito)
+      SELECT i.incendio_uuid, 'https://images.unsplash.com/photo-1447012984180-877f6b986161?auto=format&fit=crop&w=800&q=80', 'Unsplash'
+      FROM incendios i
+      WHERE i.titulo = 'Incendio en la cuenca del río'
+      AND NOT EXISTS (SELECT 1 FROM fotos_reporte f WHERE f.incendio_uuid = i.incendio_uuid);
     `)
 
     await q.commitTransaction()

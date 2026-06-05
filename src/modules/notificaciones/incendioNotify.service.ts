@@ -1,6 +1,6 @@
 // src/services/incendioNotify.service.ts
 import { PushPrefsRepo } from './pushPrefs.repo';
-import { sendFCMPush } from './fcmPush.service';
+import { sendExpoPush } from './expoPush.service';
 
 // 1. Notificar al creador cuando su incendio es aprobado
 export async function notifyIncendioAprobado(incendio: {
@@ -19,7 +19,7 @@ export async function notifyIncendioAprobado(incendio: {
   const tokens = (prefs?.tokens || []).filter(t => t.active).map(t => t.token);
   if (tokens.length === 0) return;
 
-  await sendFCMPush(tokens, {
+  await sendExpoPush(tokens, {
     title: '✅ Tu incendio fue aprobado',
     body: incendio.titulo || 'Toca para ver detalles',
     data: {
@@ -49,7 +49,7 @@ export async function notifyIncendioActualizado(incendio: {
   
   if (!tokens.length) return;
 
-  await sendFCMPush(tokens, {
+  await sendExpoPush(tokens, {
     title: '📢 Actualización de incendio',
     body: incendio.cambios 
       ? `${incendio.titulo || 'Incendio'} - ${incendio.cambios}`
@@ -81,7 +81,7 @@ export async function notifyIncendioCerrado(incendio: {
   
   if (!tokens.length) return;
 
-  await sendFCMPush(tokens, {
+  await sendExpoPush(tokens, {
     title: '✅ Incendio cerrado',
     body: incendio.resumenCierre 
       ? `${incendio.titulo || 'Incendio'} - ${incendio.resumenCierre}`
@@ -107,7 +107,7 @@ export async function notifyIncendioNuevoMunicipio(incendio: {
 
   const locationText = incendio.ubicacion ? ` en ${incendio.ubicacion}` : '';
 
-  await sendFCMPush(tokens, {
+  await sendExpoPush(tokens, {
     title: '🔥 Nuevo incendio en tu municipio',
     body: `${incendio.titulo || 'Incendio reportado'}${locationText}`,
     data: {
@@ -132,7 +132,7 @@ export async function notifyIncendioNuevoDepartamento(incendio: {
 
   const locationText = incendio.municipioNombre ? ` en ${incendio.municipioNombre}` : '';
 
-  await sendFCMPush(tokens, {
+  await sendExpoPush(tokens, {
     title: '🔥 Nuevo incendio en tu región',
     body: `${incendio.titulo || 'Incendio reportado'}${locationText}`,
     data: {
@@ -181,7 +181,7 @@ export async function notifyAdminsIncendioPendiente(incendio: {
   // 2. Enviar Push a los admins
   const tokens = await PushPrefsRepo.getTokensForUserIds(adminIds);
   if (tokens.length > 0) {
-    await sendFCMPush(tokens, {
+    await sendExpoPush(tokens, {
       title: '⚠️ Nuevo incendio pendiente',
       body: `"${incendio.titulo}" requiere aprobación`,
       data: {

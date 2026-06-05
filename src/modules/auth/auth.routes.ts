@@ -5,7 +5,6 @@ import { Usuario } from '../seguridad/entities/usuario.entity'
 import { IsNull } from 'typeorm'
 import { verifyPassword, hashPassword } from '../../utils/password'
 import { signAccessToken } from '../../utils/jwt'
-import { getFirebaseAdmin } from '../notificaciones/firebasePush.service'
 import { randomUUID } from 'crypto'
 
 const router = Router()
@@ -25,11 +24,6 @@ const publicRegisterSchema = z.object({
   password: z.string().min(6),
   institucion_uuid: z.string().uuid().optional().nullable(),
   expoPushToken: z.string().optional(), // ← También para registro
-})
-
-const firebaseLoginSchema = z.object({
-  idToken: z.string().min(1), // Token de Firebase del frontend
-  expoPushToken: z.string().optional(),
 })
 
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
@@ -194,164 +188,6 @@ router.post('/login', async (req, res, next) => {
         // No fallar el login si falla el token
       }
     }
-    res.json({
-      token,
-      user: {
-        usuario_uuid: user.usuario_uuid,
-        email: user.email,
-        nombre: (user as any).nombre,
-        apellido: (user as any).apellido,
-        is_admin: (user as any).is_admin,
-        rol_uuid: (user as any)?.rol?.rol_uuid ?? null,
-        institucion_uuid: (user as any)?.institucion?.institucion_uuid ?? null,
-      },
-    })
-  } catch (err: any) {
-    if (err?.issues) {
-      return res.status(400).json({
-        error: { code: 'BAD_REQUEST', message: 'Validación', issues: err.issues },
-        requestId: res.locals.ctx?.requestId,
-      })
-    }
-    next(err)
-  }
-})
-
-/**
- * LOGIN con Firebase - POST /auth/firebase-login
- * - Usuario hace login en el frontend con Firebase (Google, Facebook, etc.)
- * - Frontend envía el idToken de Firebase
- * - Backend verifica el token y crea/encuentra el usuario
- * - Devuelve tu propio JWT
- */
-router.post('/firebase-login', async (req, res, next) => {
-  try {
-    const { idToken, expoPushToken } = firebaseLoginSchema.parse(req.body)
-
-    // 1. Verificar el token de Firebase
-    let decodedToken
-    try {
-      const admin = getFirebaseAdmin()
-      decodedToken = await admin.auth().verifyIdToken(idToken)
-    } catch (err: any) {
-      console.error('❌ Error verificando token de Firebase:', err.message)
-      if (err?.code === 'auth/id-token-expired') {
-        return res.status(401).json({
-          error: { code: 'TOKEN_EXPIRED', message: 'Token de Firebase expirado' },
-          requestId: res.locals.ctx?.requestId,
-        })
-      }
-      return res.status(400).json({
-        error: { code: 'INVALID_TOKEN', message: 'Token de Firebase inválido' },
-        requestId: res.locals.ctx?.requestId,
-      })
-    }
-
-    // 2. Extraer datos del usuario de Firebase
-    const firebaseUid = decodedToken.uid
-    const email = decodedToken.email?.toLowerCase().trim()
-    const displayName = decodedToken.name || 'Usuario'
-    const photoUrl = decodedToken.picture
-
-    if (!email) {
-      return res.status(400).json({
-        error: { code: 'NO_EMAIL', message: 'El usuario de Firebase no tiene email' },
-        requestId: res.locals.ctx?.requestId,
-      })
-    }
-
-    const repo = AppDataSource.getRepository(Usuario)
-
-    // 3. Buscar o crear usuario en tu BD
-    let user = await repo.findOne({
-      where: { email, eliminado_en: IsNull() },
-      relations: ['rol', 'institucion'],
-    })
-
-    // Si no existe, crear usuario nuevo
-    if (!user) {
-      console.log(`🆕 Creando nuevo usuario desde Firebase: ${email}`)
-
-      // Obtener rol por defecto
-      const row = await AppDataSource.manager.query(
-        `SELECT rol_uuid FROM roles WHERE UPPER(nombre)=UPPER($1) LIMIT 1`,
-        ['USUARIO']
-      )
-      const defaultRoleUuid: string | undefined = row?.[0]?.rol_uuid
-
-      if (!defaultRoleUuid) {
-        return res.status(500).json({
-          error: { code: 'PUBLIC_ROLE_NOT_FOUND', message: 'Rol USUARIO no encontrado. Verifica el seed.' },
-          requestId: res.locals.ctx?.requestId,
-        })
-      }
-
-      // Crear usuario sin password real (usa Firebase)
-      const [nombreParte = 'Usuario', ...apellidoPartes] = displayName.split(' ')
-      const apellidoParte = apellidoPartes.join(' ') || 'Firebase'
-
-      user = repo.create({
-        nombre: nombreParte,
-        apellido: apellidoParte,
-        email,
-        telefono: null,
-        password_hash: await hashPassword(randomUUID()), // Password random (no se usa)
-        rol: { rol_uuid: defaultRoleUuid } as any,
-        is_admin: false,
-        // Opcional: guardar firebase_uid para referencia futura
-        // Si agregas campo firebase_uid a la entidad Usuario, descomenta:
-        // firebase_uid: firebaseUid,
-      })
-
-      await repo.save(user)
-      console.log(`✅ Usuario creado desde Firebase: ${email}`)
-    } else {
-      console.log(`✅ Usuario existente encontrado: ${email}`)
-    }
-
-    // 4. Generar tu propio JWT
-    const fullName = `${(user as any).nombre ?? ''} ${(user as any).apellido ?? ''}`.trim()
-
-    const token = signAccessToken({
-      sub: user.usuario_uuid,
-      email: user.email || undefined,
-      is_admin: !!(user as any).is_admin,
-      rol_uuid: (user as any)?.rol?.rol_uuid || undefined,
-      institucion_uuid: (user as any)?.institucion?.institucion_uuid || undefined,
-      nombre: fullName || undefined,
-    })
-
-    // 5. Actualizar último login
-    await repo.update({ usuario_uuid: user.usuario_uuid }, { ultimo_login: new Date() })
-
-    // 6. Registrar push token si viene
-    if (expoPushToken) {
-      console.log('🔔 Intentando registrar token push:', {
-        userId: user.usuario_uuid,
-        token: expoPushToken.substring(0, 30) + '...',
-      })
-
-      try {
-        const { PushService } = await import('../notificaciones/push.service')
-
-        const result = await PushService.register({
-          userId: user.usuario_uuid,
-          expoPushToken,
-          avisarmeAprobado: true,
-          avisarmeActualizaciones: true,
-          avisarmeCierres: true,
-          municipiosSuscritos: [],
-          departamentosSuscritos: [],
-        })
-
-        console.log('✅ Token push registrado exitosamente:', result)
-      } catch (err) {
-        console.error('❌ Error registrando token push en Firebase login:', err)
-        // No fallar el login si falla el token
-      }
-    }
-
-    // 7. Responder con token y usuario
     res.json({
       token,
       user: {

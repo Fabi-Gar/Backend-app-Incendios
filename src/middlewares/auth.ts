@@ -31,7 +31,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   const publicPaths = new Set<string>([
     '/api/auth/login',
     '/api/auth/register',
-    '/api/auth/firebase-login', // Login con Firebase
     '/api/health/liveness',
     '/api/health/readiness',
   ])

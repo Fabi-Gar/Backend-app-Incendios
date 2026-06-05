@@ -1,6 +1,6 @@
 // src/modules/notificaciones/testpush.routes.ts
 import { Router } from 'express';
-import { sendFCMPush } from './fcmPush.service';
+import { sendExpoPush } from './expoPush.service';
 import { PushPrefsRepo } from './pushPrefs.repo';
 import { guardAuth } from '../../middlewares/auth';
 
@@ -20,7 +20,7 @@ router.post('/test-push', async (req, res) => {
 
     console.log('📤 Enviando notificación FCM de prueba a:', token.substring(0, 30) + '...');
 
-    await sendFCMPush([token], {
+    await sendExpoPush([token], {
       title: title || '🔥 Notificación de prueba FCM',
       body: body || 'Si ves esto, Firebase Cloud Messaging funciona correctamente',
       data: { 
@@ -80,7 +80,7 @@ router.post('/test-push-me', guardAuth, async (req, res) => {
 
     console.log(`📤 Enviando notificación FCM a ${activeTokens.length} dispositivo(s)`);
 
-    await sendFCMPush(activeTokens, {
+    await sendExpoPush(activeTokens, {
       title: '🎉 Test de notificación personal',
       body: 'Tus notificaciones FCM están funcionando correctamente',
       data: { 
@@ -136,7 +136,7 @@ router.post('/test-push-region', async (req, res) => {
 
     console.log(`📤 Enviando notificación FCM a ${tokens.length} usuario(s) en ${locationName}`);
 
-    await sendFCMPush(tokens, {
+    await sendExpoPush(tokens, {
       title: '🔥 Alerta de prueba regional',
       body: `Test de notificación FCM para ${locationName}`,
       data: { 

@@ -96,6 +96,7 @@ app.use('/api/incendios', incendiosRoutes)
 app.use('/api/seguidores', seguidoresRoutes)
 
 // ---------------- Rutas Catálogos y Seguridad ----------------
+app.use('/api/auth', authRoutes)
 app.use('/api/usuarios', usuariosRoutes)
 app.use('/api/roles', rolesRoutes)
 app.use('/api/instituciones', institucionesRoutes)

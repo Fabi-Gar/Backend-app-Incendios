@@ -4,8 +4,6 @@ import env from './config/env'
 import { AppDataSource } from './db/data-source'
 import pino from 'pino'
 import { ensureFirmsCron } from './modules/geoespacial/firms.queue'
-import { initFirebase } from './modules/notificaciones/firebasePush.service'
-
 const logger = pino({ level: env.LOG_LEVEL })
 
 async function main() {
@@ -16,14 +14,7 @@ async function main() {
       logger.info('✅ Base de datos conectada')
     }
 
-    // 2. Inicializar Firebase (AGREGAR ESTO) ←
-    try {
-      initFirebase()
-      logger.info('✅ Firebase inicializado')
-    } catch (error) {
-      logger.error({ err: error }, '⚠️ Firebase no se pudo inicializar')
-      logger.warn('   Las notificaciones push NO funcionarán')
-    }
+
 
     // 3. Inicializar cron FIRMS (si está habilitado)
     if (env.FIRMS_ENABLED) {

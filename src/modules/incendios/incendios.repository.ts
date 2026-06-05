@@ -76,7 +76,7 @@ export class IncendiosRepository {
       LEFT JOIN usuarios u ON u.usuario_uuid = i.creado_por_uuid
       LEFT JOIN departamentos d ON d.departamento_uuid = i.departamento_uuid
       LEFT JOIN municipios m ON m.municipio_uuid = i.municipio_uuid
-      LEFT JOIN catalogo_medios med ON med.medio_uuid = i.medio_uuid
+      LEFT JOIN medios med ON med.medio_uuid = i.medio_uuid
     `
   }
 
