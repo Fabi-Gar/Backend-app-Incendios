@@ -147,42 +147,82 @@ if (hasDepartamentos && hasMunicipios) {
     await q.query(`
       WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
            e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='REPORTADO' LIMIT 1),
-           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Huehuetenango' LIMIT 1)
-      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre, inab_objectid, inab_tipo_incendio, inab_institucion, inab_departamento, inab_municipio, inab_fecha_hora)
-      SELECT 'Incendio forestal cerro Cruz Quemada', 'Se reporta una gran columna de humo visible desde la carretera', ST_SetSRID(ST_MakePoint(-91.472, 15.319), 4326), true, false, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Vecino Anónimo', 1001, 'Forestal', 'INAB', 'Huehuetenango', 'Huehuetenango', NOW()
-      FROM u, e, m
-      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio forestal cerro Cruz Quemada');
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Huehuetenango' LIMIT 1),
+           ins AS (
+             INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, creado_por_uuid, estado_incendio_uuid, inab_objectid)
+             SELECT 'Incendio forestal cerro Cruz Quemada', 'Se reporta una gran columna de humo visible desde la carretera', ST_SetSRID(ST_MakePoint(-91.472, 15.319), 4326), true, false, u.usuario_uuid, e.estado_incendio_uuid, 1001
+             FROM u, e
+             WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio forestal cerro Cruz Quemada')
+             RETURNING incendio_uuid
+           ),
+           loc AS (
+             INSERT INTO incendio_localizaciones (incendio_uuid, municipio_uuid)
+             SELECT ins.incendio_uuid, m.municipio_uuid FROM ins, m
+           )
+      INSERT INTO incendio_responsables (incendio_uuid, reportado_por, institucion)
+      SELECT ins.incendio_uuid, 'Vecino Anónimo', 'INAB' FROM ins;
     `)
 
     await q.query(`
       WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
            e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='REPORTADO' LIMIT 1),
-           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Chiantla' LIMIT 1)
-      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre)
-      SELECT 'Incendio cerca de Los Cuchumatanes', 'El fuego avanza rápidamente hacia la parte boscosa', ST_SetSRID(ST_MakePoint(-91.45, 15.35), 4326), true, false, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Guardabosques local'
-      FROM u, e, m
-      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio cerca de Los Cuchumatanes');
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Chiantla' LIMIT 1),
+           ins AS (
+             INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, creado_por_uuid, estado_incendio_uuid)
+             SELECT 'Incendio cerca de Los Cuchumatanes', 'El fuego avanza rápidamente hacia la parte boscosa', ST_SetSRID(ST_MakePoint(-91.45, 15.35), 4326), true, false, u.usuario_uuid, e.estado_incendio_uuid
+             FROM u, e
+             WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio cerca de Los Cuchumatanes')
+             RETURNING incendio_uuid
+           ),
+           loc AS (
+             INSERT INTO incendio_localizaciones (incendio_uuid, municipio_uuid)
+             SELECT ins.incendio_uuid, m.municipio_uuid FROM ins, m
+           )
+      INSERT INTO incendio_responsables (incendio_uuid, reportado_por)
+      SELECT ins.incendio_uuid, 'Guardabosques local' FROM ins;
     `)
 
     // ===== INCENDIOS FICTICIOS APROBADOS (PARA EL MAPA)
     await q.query(`
       WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
            e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='ACTIVO' LIMIT 1),
-           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Huehuetenango' LIMIT 1)
-      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, aprobado_en, aprobado_por, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre, inab_objectid, inab_tipo_incendio, inab_institucion, inab_departamento, inab_municipio, inab_estado_aviso, inab_fecha_hora)
-      SELECT 'Incendio Finca El Peñasco', 'Incendio forestal activo, brigadas de CONRED en camino', ST_SetSRID(ST_MakePoint(-91.46, 15.30), 4326), false, true, NOW(), u.usuario_uuid, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Reporte Ciudadano', 1002, 'Estructural', 'Bomberos Voluntarios', 'Huehuetenango', 'Huehuetenango', 'Confirmado', NOW()
-      FROM u, e, m
-      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio Finca El Peñasco');
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Huehuetenango' LIMIT 1),
+           ins AS (
+             INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, aprobado_en, aprobado_por, creado_por_uuid, estado_incendio_uuid, inab_objectid)
+             SELECT 'Incendio Finca El Peñasco', 'Incendio forestal activo, brigadas de CONRED en camino', ST_SetSRID(ST_MakePoint(-91.46, 15.30), 4326), false, true, NOW(), u.usuario_uuid, u.usuario_uuid, e.estado_incendio_uuid, 1002
+             FROM u, e
+             WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio Finca El Peñasco')
+             RETURNING incendio_uuid
+           ),
+           loc AS (
+             INSERT INTO incendio_localizaciones (incendio_uuid, municipio_uuid)
+             SELECT ins.incendio_uuid, m.municipio_uuid FROM ins, m
+           ),
+           con AS (
+             INSERT INTO incendio_controles (incendio_uuid, es_forestal)
+             SELECT ins.incendio_uuid, false FROM ins
+           )
+      INSERT INTO incendio_responsables (incendio_uuid, reportado_por, institucion)
+      SELECT ins.incendio_uuid, 'Reporte Ciudadano', 'Bomberos Voluntarios' FROM ins;
     `)
 
     await q.query(`
       WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),
            e AS (SELECT estado_incendio_uuid FROM estado_incendio WHERE codigo='ACTIVO' LIMIT 1),
-           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Malacatancito' LIMIT 1)
-      INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, aprobado_en, aprobado_por, creado_por_uuid, estado_incendio_uuid, municipio_uuid, reportado_por_nombre)
-      SELECT 'Incendio en la cuenca del río', 'Fuego afecta áreas cercanas al río, riesgo para cultivos', ST_SetSRID(ST_MakePoint(-91.50, 15.25), 4326), false, true, NOW(), u.usuario_uuid, u.usuario_uuid, e.estado_incendio_uuid, m.municipio_uuid, 'Bomberos Voluntarios'
-      FROM u, e, m
-      WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio en la cuenca del río');
+           m AS (SELECT municipio_uuid FROM municipios WHERE nombre='Malacatancito' LIMIT 1),
+           ins AS (
+             INSERT INTO incendios (titulo, descripcion, centroide, requiere_aprobacion, aprobado, aprobado_en, aprobado_por, creado_por_uuid, estado_incendio_uuid)
+             SELECT 'Incendio en la cuenca del río', 'Fuego afecta áreas cercanas al río, riesgo para cultivos', ST_SetSRID(ST_MakePoint(-91.50, 15.25), 4326), false, true, NOW(), u.usuario_uuid, u.usuario_uuid, e.estado_incendio_uuid
+             FROM u, e
+             WHERE NOT EXISTS (SELECT 1 FROM incendios WHERE titulo='Incendio en la cuenca del río')
+             RETURNING incendio_uuid
+           ),
+           loc AS (
+             INSERT INTO incendio_localizaciones (incendio_uuid, municipio_uuid)
+             SELECT ins.incendio_uuid, m.municipio_uuid FROM ins, m
+           )
+      INSERT INTO incendio_responsables (incendio_uuid, reportado_por)
+      SELECT ins.incendio_uuid, 'Bomberos Voluntarios' FROM ins;
     `)
 
     // ===== FOTOS PARA LOS INCENDIOS =====

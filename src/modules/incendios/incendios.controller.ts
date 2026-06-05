@@ -44,19 +44,77 @@ async function getDefaultEstadoUuid() {
   return null
 }
 
+const localizacionSchema = z.object({
+  departamento_uuid: z.string().uuid().optional().nullable(),
+  municipio_uuid: z.string().uuid().optional().nullable(),
+  region_inab: z.number().optional().nullable(),
+  subregion_inab: z.string().optional().nullable(),
+  lugar_poblado: z.string().optional().nullable(),
+  finca: z.string().optional().nullable(),
+  coordenada_x: z.number().optional().nullable(),
+  coordenada_y: z.number().optional().nullable(),
+})
+
+const controlSchema = z.object({
+  es_forestal: z.boolean().optional().nullable(),
+  area_estimada_ha: z.number().optional().nullable(),
+  area_dentro_ap_ha: z.number().optional().nullable(),
+  area_fuera_ap_ha: z.number().optional().nullable(),
+  metodo_control: z.string().optional().nullable(),
+})
+
+const vegetacionSchema = z.object({
+  conifera_ha: z.number().optional().nullable(),
+  latifoliado_ha: z.number().optional().nullable(),
+  mixto_ha: z.number().optional().nullable(),
+  manglar_ha: z.number().optional().nullable(),
+  pastizal_ha: z.number().optional().nullable(),
+  humedal_ha: z.number().optional().nullable(),
+  pajonal_ha: z.number().optional().nullable(),
+  sabana_ha: z.number().optional().nullable(),
+  guamil_ha: z.number().optional().nullable(),
+  observaciones: z.string().optional().nullable(),
+})
+
+const mediosSchema = z.object({
+  medio_uuid: z.string().uuid().optional().nullable(),
+  personas_conred: z.number().optional().nullable(),
+  personas_bomberos: z.number().optional().nullable(),
+  personas_inab: z.number().optional().nullable(),
+  personas_municipio: z.number().optional().nullable(),
+  personas_ejercito: z.number().optional().nullable(),
+  vehiculos_motobombas: z.number().optional().nullable(),
+  vuelos: z.number().optional().nullable(),
+  observaciones: z.string().optional().nullable(),
+})
+
+const meteorologiaSchema = z.object({
+  temperatura_c: z.number().optional().nullable(),
+  humedad_relativa: z.number().optional().nullable(),
+  velocidad_viento_kmh: z.number().optional().nullable(),
+  direccion_viento: z.string().optional().nullable(),
+  observaciones: z.string().optional().nullable(),
+})
+
+const responsableSchema = z.object({
+  institucion_uuid: z.string().uuid().optional().nullable(),
+  reportado_por: z.string().optional().nullable(),
+  telefono: z.string().optional().nullable(),
+  fecha_hora_aviso: z.coerce.date().optional().nullable(),
+})
+
 const createIncendioSchema = z.object({
   titulo: z.string().min(1),
   descripcion: z.string().nullish(),
   centroide: point4326.nullish(),
   estado_incendio_uuid: z.string().uuid().optional(),
-  institucion_reporte_uuid: z.string().uuid().optional().nullable(),
-  medio_uuid: z.string().uuid(),
-  reportado_en: z.coerce.date().optional(),
-  telefono: z.string().optional().nullable(),
-  departamento_uuid: z.string().uuid().optional().nullable(),
-  municipio_uuid: z.string().uuid().optional().nullable(),
-  lugar_poblado: z.string().optional().nullable(),
-  finca: z.string().optional().nullable(),
+  
+  localizacion: localizacionSchema.optional().nullable(),
+  control: controlSchema.optional().nullable(),
+  vegetacion: vegetacionSchema.optional().nullable(),
+  medios: mediosSchema.optional().nullable(),
+  meteorologia: meteorologiaSchema.optional().nullable(),
+  responsable: responsableSchema.optional().nullable(),
 })
 
 const updateIncendioSchema = z.object({
@@ -64,6 +122,13 @@ const updateIncendioSchema = z.object({
   descripcion: z.string().optional(),
   centroide: point4326.nullish().optional(),
   estado_incendio_uuid: z.string().uuid().optional(),
+
+  localizacion: localizacionSchema.optional().nullable(),
+  control: controlSchema.optional().nullable(),
+  vegetacion: vegetacionSchema.optional().nullable(),
+  medios: mediosSchema.optional().nullable(),
+  meteorologia: meteorologiaSchema.optional().nullable(),
+  responsable: responsableSchema.optional().nullable(),
 })
 
 const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads')
@@ -122,7 +187,8 @@ export class IncendiosController {
         where,
         order: { creado_en: 'DESC' },
         take: pageSize,
-        skip: (page - 1) * pageSize
+        skip: (page - 1) * pageSize,
+        relations: ['localizacion', 'estado_incendio']
       })
 
       res.json({ total, page, pageSize, items })
@@ -138,6 +204,12 @@ export class IncendiosController {
         relations: {
           creado_por: true,
           estado_incendio: true,
+          localizacion: true,
+          control: true,
+          vegetacion: true,
+          medios: true,
+          meteorologia: true,
+          responsable: true,
         }
       })
       const u = res.locals.ctx.user
@@ -171,18 +243,25 @@ export class IncendiosController {
         })
       }
 
-      const institucionReporteUuid =
-        body.institucion_reporte_uuid ??
-        (user as any)?.institucion_uuid ??
-        (user as any)?.institucion?.institucion_uuid ??
-        null
-
       const reportanteNombre =
         `${(user as any)?.nombre ?? ''} ${(user as any)?.apellido ?? ''}`.trim() ||
         (user as any)?.email ||
         'Usuario'
 
-      const telefonoReporte = body.telefono ?? (user as any)?.telefono ?? null
+      const telefonoReporte = body.responsable?.telefono ?? (user as any)?.telefono ?? null
+
+      const institucionReporteUuid =
+        body.responsable?.institucion_uuid ??
+        (user as any)?.institucion_uuid ??
+        (user as any)?.institucion?.institucion_uuid ??
+        null
+
+      const responsableData = body.responsable ?? {
+        reportado_por: reportanteNombre,
+        telefono: telefonoReporte,
+        institucion_uuid: institucionReporteUuid,
+        fecha_hora_aviso: new Date()
+      }
 
       const result = await AppDataSource.transaction(async (trx) => {
         const incRepo = trx.getRepository(Incendio)
@@ -195,8 +274,13 @@ export class IncendiosController {
           aprobado: false,
           creado_por: { usuario_uuid: user.usuario_uuid } as any,
           estado_incendio: { estado_incendio_uuid: estadoUuid } as any,
-
-          // Se eliminaron campos del reporte. El usuario rehacerá este endpoint.
+          
+          localizacion: body.localizacion ?? undefined,
+          control: body.control ?? undefined,
+          vegetacion: body.vegetacion ?? undefined,
+          medios: body.medios ?? undefined,
+          meteorologia: body.meteorologia ?? undefined,
+          responsable: responsableData as any,
         } as Partial<Incendio>) as Incendio
 
         const savedInc = await incRepo.save(inc)
@@ -307,7 +391,7 @@ export class IncendiosController {
 
       const inc = await repo.findOne({ 
         where: { incendio_uuid: uuid, eliminado_en: IsNull() },
-        relations: ['creado_por']
+        relations: ['creado_por', 'localizacion', 'control', 'vegetacion', 'medios', 'meteorologia', 'responsable']
       })
       if (!inc) {
         return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Incendio no existe' }, requestId: res.locals.ctx?.requestId })
@@ -333,6 +417,24 @@ export class IncendiosController {
       if (typeof body.centroide !== 'undefined') {
         cambiosTexto.push('Ubicación actualizada')
         ;(inc as any).centroide = body.centroide ?? null
+      }
+      if (typeof body.localizacion !== 'undefined') {
+        inc.localizacion = body.localizacion ? { ...inc.localizacion, ...body.localizacion } as any : null;
+      }
+      if (typeof body.control !== 'undefined') {
+        inc.control = body.control ? { ...inc.control, ...body.control } as any : null;
+      }
+      if (typeof body.vegetacion !== 'undefined') {
+        inc.vegetacion = body.vegetacion ? { ...inc.vegetacion, ...body.vegetacion } as any : null;
+      }
+      if (typeof body.medios !== 'undefined') {
+        inc.medios = body.medios ? { ...inc.medios, ...body.medios } as any : null;
+      }
+      if (typeof body.meteorologia !== 'undefined') {
+        inc.meteorologia = body.meteorologia ? { ...inc.meteorologia, ...body.meteorologia } as any : null;
+      }
+      if (typeof body.responsable !== 'undefined') {
+        inc.responsable = body.responsable ? { ...inc.responsable, ...body.responsable } as any : null;
       }
 
       let nuevoEstadoUuid: string | null = null

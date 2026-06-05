@@ -22,12 +22,10 @@ router.get('/:uuid', IncendiosController.getDetalle)
 
 // -------------------- CREAR INCENDIO --------------------
 // RUTAS DE CREACIÓN Y MODIFICACIÓN LOCAL (Comentadas por integración INAB - Modo Solo Lectura híbrido)
-/*
 router.post('/', guardAuth, upload.single('file'), IncendiosController.crear)
 router.patch('/:uuid', guardAuth, IncendiosController.actualizar)
 router.patch('/:uuid/aprobar', guardAuth, guardAdminOrInstitucion, IncendiosController.aprobar)
 router.patch('/:uuid/rechazar', guardAuth, guardAdminOrInstitucion, IncendiosController.rechazar)
-*/
 
 // -------------------- HISTORIAL --------------------
 router.get('/:uuid/historial', IncendiosController.historial)

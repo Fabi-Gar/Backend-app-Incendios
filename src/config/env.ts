@@ -49,6 +49,7 @@ const schema = z.object({
   FIRMS_BBOX_GTM: z.string().default(''),
   FIRMS_USE_AREA_FALLBACK: z.coerce.boolean().default(true),
   FIRMS_FETCH_CRON: z.string().default('0 */2 * * *'),
+  INAB_FETCH_CRON: z.string().default('0 6-18 * * *'),
 
   FIRMS_BUFFER_KM: z.coerce.number().positive().default(25),
   FIRMS_TIME_WINDOW_H: z.coerce.number().int().positive().default(48),

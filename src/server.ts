@@ -4,6 +4,7 @@ import env from './config/env'
 import { AppDataSource } from './db/data-source'
 import pino from 'pino'
 import { ensureFirmsCron } from './modules/geoespacial/firms.queue'
+import { ensureInabCron } from './modules/incendios/inab.queue'
 const logger = pino({ level: env.LOG_LEVEL })
 
 async function main() {
@@ -21,6 +22,10 @@ async function main() {
       await ensureFirmsCron()
       logger.info(`🛰️ Cron FIRMS programado: ${env.FIRMS_FETCH_CRON}`)
     }
+
+    // 4. Inicializar cron INAB
+    await ensureInabCron()
+    logger.info(`🌲 Cron INAB programado: ${env.INAB_FETCH_CRON}`)
 
     // 4. Iniciar servidor
     const port = env.PORT || 4000
