@@ -2,16 +2,15 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Usuario } from '../../seguridad/entities/usuario.entity'
 import { EstadoIncendio } from '../../catalogos/entities/estado-incendio.entity'
 import { InfoFalsaIncendio } from '../../responsable/entities/info-falsa-incendio.entity'
-import { Institucion } from '../../seguridad/entities/institucion.entity'
-import { Medio } from '../../catalogos/entities/medio.entity'
-import { Departamento } from '../../catalogos/entities/departamento.entity'
-import { Municipio } from '../../catalogos/entities/municipio.entity'
+import { IncendioLocalizacion } from './incendio-localizacion.entity'
+import { IncendioControl } from './incendio-control.entity'
+import { IncendioVegetacion } from './incendio-vegetacion.entity'
+import { IncendioMedios } from './incendio-medios.entity'
+import { IncendioMeteorologia } from './incendio-meteorologia.entity'
+import { IncendioResponsable } from './incendio-responsable.entity'
 import { IncendioSeguidor } from './incendio-seguidor.entity'
 
 @Index('idx_incendios_estado_aprobado', ['estado_incendio', 'aprobado'])
-@Index('idx_incendios_reportado_en', ['reportado_en'])
-@Index('idx_incendios_departamento', ['departamento'])
-@Index('idx_incendios_municipio', ['municipio'])
 @Entity('incendios')
 export class Incendio {
   @PrimaryGeneratedColumn('uuid', { name: 'incendio_uuid' })
@@ -63,92 +62,31 @@ export class Incendio {
   @OneToOne(() => InfoFalsaIncendio, (f) => f.incendio)
   info_falsa?: InfoFalsaIncendio | null
 
-  // ========== Campos del reporte inicial (migrados de tabla reportes) ==========
+  @OneToOne(() => IncendioLocalizacion, (l) => l.incendio, { cascade: true })
+  localizacion?: IncendioLocalizacion | null
 
-  @ManyToOne(() => Usuario, { nullable: true })
-  @JoinColumn({ name: 'reportado_por_uuid', referencedColumnName: 'usuario_uuid', foreignKeyConstraintName: 'fk_incendios_reportado_por_uuid' })
-  reportado_por!: Usuario | null
+  @OneToOne(() => IncendioControl, (c) => c.incendio, { cascade: true })
+  control?: IncendioControl | null
 
-  @Column({ type: 'text', nullable: true })
-  reportado_por_nombre!: string | null
+  @OneToOne(() => IncendioVegetacion, (v) => v.incendio, { cascade: true })
+  vegetacion?: IncendioVegetacion | null
 
-  @ManyToOne(() => Institucion, { nullable: true })
-  @JoinColumn({ name: 'institucion_reporte_uuid', referencedColumnName: 'institucion_uuid', foreignKeyConstraintName: 'fk_incendios_institucion_reporte_uuid' })
-  institucion_reporte!: Institucion | null
+  @OneToOne(() => IncendioMedios, (m) => m.incendio, { cascade: true })
+  medios?: IncendioMedios | null
 
-  @Column({ type: 'text', nullable: true })
-  telefono!: string | null
+  @OneToOne(() => IncendioMeteorologia, (m) => m.incendio, { cascade: true })
+  meteorologia?: IncendioMeteorologia | null
 
-  @Column({ type: 'timestamptz', nullable: true })
-  reportado_en!: Date | null
+  @OneToOne(() => IncendioResponsable, (r) => r.incendio, { cascade: true })
+  responsable?: IncendioResponsable | null
 
-  @ManyToOne(() => Medio, { nullable: true })
-  @JoinColumn({ name: 'medio_uuid', referencedColumnName: 'medio_uuid', foreignKeyConstraintName: 'fk_incendios_medio_uuid' })
-  medio!: Medio | null
-
-  @ManyToOne(() => Departamento, { nullable: true })
-  @JoinColumn({ name: 'departamento_uuid', referencedColumnName: 'departamento_uuid', foreignKeyConstraintName: 'fk_incendios_departamento_uuid' })
-  departamento!: Departamento | null
-
-  @ManyToOne(() => Municipio, { nullable: true })
-  @JoinColumn({ name: 'municipio_uuid', referencedColumnName: 'municipio_uuid', foreignKeyConstraintName: 'fk_incendios_municipio_uuid' })
-  municipio!: Municipio | null
-
-  @Column({ type: 'text', nullable: true })
-  lugar_poblado!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  finca!: string | null
-
-  // =============================================================================
-
-  // ========================== DATOS INAB (ArcGIS REST) ==========================
+  // ========================== DATOS INAB (Identificadores) ==========================
   @Column({ type: 'int', nullable: true, unique: true })
   inab_objectid!: number | null
 
   @Column({ type: 'text', nullable: true })
   inab_globalid!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_tipo_incendio!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_estado_aviso!: string | null
-
-  @Column({ type: 'double precision', nullable: true })
-  inab_coordenada_x!: number | null
-
-  @Column({ type: 'double precision', nullable: true })
-  inab_coordenada_y!: number | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_departamento!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_municipio!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_region!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_subregion!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_institucion!: string | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_reportado_por!: string | null
-
-  @Column({ type: 'timestamptz', nullable: true })
-  inab_fecha_hora!: Date | null
-
-  @Column({ type: 'text', nullable: true })
-  inab_link_googlemaps!: string | null
   // ==============================================================================
-
-  // Fecha de extinción del incendio (cierre final)
-  @Column({ type: 'timestamptz', nullable: true })
-  extinguido_at!: Date | null
 
   @CreateDateColumn({ type: 'timestamptz', name: 'creado_en', default: () => 'now()' })
   creado_en!: Date

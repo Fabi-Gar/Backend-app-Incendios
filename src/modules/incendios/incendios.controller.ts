@@ -137,11 +137,6 @@ export class IncendiosController {
         where: { incendio_uuid: uuid, eliminado_en: IsNull() },
         relations: {
           creado_por: true,
-          reportado_por: true,
-          institucion_reporte: true,
-          medio: true,
-          departamento: true,
-          municipio: true,
           estado_incendio: true,
         }
       })
@@ -201,16 +196,7 @@ export class IncendiosController {
           creado_por: { usuario_uuid: user.usuario_uuid } as any,
           estado_incendio: { estado_incendio_uuid: estadoUuid } as any,
 
-          reportado_por: { usuario_uuid: user.usuario_uuid } as any,
-          reportado_por_nombre: reportanteNombre,
-          institucion_reporte: institucionReporteUuid ? { institucion_uuid: institucionReporteUuid } as any : null,
-          telefono: telefonoReporte,
-          reportado_en: body.reportado_en ?? new Date(),
-          medio: body.medio_uuid ? { medio_uuid: body.medio_uuid } as any : null,
-          departamento: body.departamento_uuid ? { departamento_uuid: body.departamento_uuid } as any : null,
-          municipio: body.municipio_uuid ? { municipio_uuid: body.municipio_uuid } as any : null,
-          lugar_poblado: body.lugar_poblado ?? null,
-          finca: body.finca ?? null,
+          // Se eliminaron campos del reporte. El usuario rehacerá este endpoint.
         } as Partial<Incendio>) as Incendio
 
         const savedInc = await incRepo.save(inc)

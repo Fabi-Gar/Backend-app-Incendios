@@ -59,18 +59,22 @@ export async function syncInabIncidents() {
       if (existing) {
         // Actualizar
         existing.inab_globalid = attr.globalid
-        existing.inab_tipo_incendio = attr.tipo_incendio
-        existing.inab_estado_aviso = attr.estado_aviso
-        existing.inab_coordenada_x = attr.coordenada_x
-        existing.inab_coordenada_y = attr.coordenada_y
-        existing.inab_departamento = attr.departamento
-        existing.inab_municipio = attr.municipio
-        existing.inab_region = attr.region_inab
-        existing.inab_subregion = attr.subregion_inab
-        existing.inab_institucion = attr.institucion
-        existing.inab_reportado_por = attr.reportado_por
-        existing.inab_fecha_hora = fechaHora
-        existing.inab_link_googlemaps = attr.link_googlemaps
+        
+        if (!existing.localizacion) existing.localizacion = {} as any;
+        existing.localizacion!.coordenada_x = attr.coordenada_x;
+        existing.localizacion!.coordenada_y = attr.coordenada_y;
+        existing.localizacion!.departamento = attr.departamento;
+        existing.localizacion!.municipio = attr.municipio;
+        existing.localizacion!.region_inab = attr.region_inab;
+        existing.localizacion!.subregion_inab = attr.subregion_inab;
+
+        if (!existing.responsable) existing.responsable = {} as any;
+        existing.responsable!.institucion = attr.institucion;
+        existing.responsable!.reportado_por = attr.reportado_por;
+        existing.responsable!.fecha_hora_aviso = fechaHora;
+
+        if (!existing.control) existing.control = {} as any;
+        existing.control!.es_forestal = attr.tipo_incendio === 'Forestal';
 
         // Sincronizar título y coordenadas nativas para que funcione el visor general
         existing.titulo = `INAB: Incendio en ${attr.municipio || 'desconocido'}`
@@ -82,25 +86,26 @@ export async function syncInabIncidents() {
         const nuevo = incendioRepo.create({
           inab_objectid: attr.objectid,
           inab_globalid: attr.globalid,
-          inab_tipo_incendio: attr.tipo_incendio,
-          inab_estado_aviso: attr.estado_aviso,
-          inab_coordenada_x: attr.coordenada_x,
-          inab_coordenada_y: attr.coordenada_y,
-          inab_departamento: attr.departamento,
-          inab_municipio: attr.municipio,
-          inab_region: attr.region_inab,
-          inab_subregion: attr.subregion_inab,
-          inab_institucion: attr.institucion,
-          inab_reportado_por: attr.reportado_por,
-          inab_fecha_hora: fechaHora,
-          inab_link_googlemaps: attr.link_googlemaps,
-
           titulo: `INAB: Incendio en ${attr.municipio || 'desconocido'}`,
           aprobado: true, // Auto aprobado porque viene del INAB
           requiere_aprobacion: false,
           estado_incendio: { estado_incendio_uuid: estado.estado_incendio_uuid } as any,
-          // Falso creador (sistema) o dejar nulo si la DB lo permite (si la relacion no es obligatoria)
-          // La entidad Incendio actualmente requiere 'creado_por', vamos a ver si se puede ignorar o buscar un admin
+          localizacion: {
+            coordenada_x: attr.coordenada_x,
+            coordenada_y: attr.coordenada_y,
+            departamento: attr.departamento,
+            municipio: attr.municipio,
+            region_inab: attr.region_inab,
+            subregion_inab: attr.subregion_inab
+          },
+          responsable: {
+            institucion: attr.institucion,
+            reportado_por: attr.reportado_por,
+            fecha_hora_aviso: fechaHora
+          },
+          control: {
+            es_forestal: attr.tipo_incendio === 'Forestal'
+          }
         })
         
         // Asignar un usuario por defecto si creado_por es NOT NULL (nuestro esquema pide creado_por).

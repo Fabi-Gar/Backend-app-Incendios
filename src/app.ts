@@ -33,9 +33,6 @@ import estadosIncendioRoutes from './app/estados-incendio.routes'
 import puntosCalorRoutes from './modules/geoespacial/puntos-calor.routes'
 import monitorRoutes from './app/monitor.routes'
 import departamentosRoutes from './modules/catalogos/entities/departamentos.routes'
-import cierreRoutes from './modules/cierre/cierre.routes'
-import plantillasRoutes from './modules/cierre/plantillas.routes'
-
 // Subidas (fotos de incendio)
 // (Integradas en los endpoints principales o removidas temporalmente)
 
@@ -105,8 +102,6 @@ app.use('/api/estados-incendio', estadosIncendioRoutes)
 app.use('/api/departamentos', departamentosRoutes)
 
 // ---------------- Rutas Otros Módulos ----------------
-app.use('/api/cierre', cierreRoutes)
-app.use('/api/cierre-admin', plantillasRoutes)
 app.use('/api/firms', firmsRoutes)
 app.use('/api/puntos-calor', puntosCalorRoutes)
 app.use('/api/monitor', monitorRoutes)
