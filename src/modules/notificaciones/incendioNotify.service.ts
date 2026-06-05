@@ -143,3 +143,52 @@ export async function notifyIncendioNuevoDepartamento(incendio: {
     },
   });
 }
+
+// 6. Notificar a administradores sobre incendio pendiente
+export async function notifyAdminsIncendioPendiente(incendio: {
+  id: string | number;
+  titulo?: string;
+  creadoPor: string;
+}) {
+  const { AppDataSource } = await import('../../db/data-source');
+  const { Notificacion } = await import('./entities/notificacion.entity');
+  
+  const admins = await AppDataSource.query(
+    `SELECT u.usuario_uuid
+     FROM usuarios u
+     WHERE u.is_admin = true AND u.eliminado_en IS NULL`
+  );
+
+  const adminIds = admins.map((a: any) => a.usuario_uuid);
+  if (adminIds.length === 0) return;
+
+  const notiRepo = AppDataSource.getRepository(Notificacion);
+
+  // 1. Guardar notificaciones en BD (para la campanita)
+  for (const adminId of adminIds) {
+    await notiRepo.save({
+      usuario_uuid: adminId,
+      tipo: 'incendio_pendiente_aprobacion',
+      titulo: '⚠️ Nuevo incendio pendiente de aprobación',
+      mensaje: `"${incendio.titulo}" requiere tu aprobación`,
+      payload: {
+        incendio_id: String(incendio.id),
+        creado_por: incendio.creadoPor,
+      },
+    });
+  }
+
+  // 2. Enviar Push a los admins
+  const tokens = await PushPrefsRepo.getTokensForUserIds(adminIds);
+  if (tokens.length > 0) {
+    await sendFCMPush(tokens, {
+      title: '⚠️ Nuevo incendio pendiente',
+      body: `"${incendio.titulo}" requiere aprobación`,
+      data: {
+        tipo: 'incendio_pendiente_aprobacion',
+        incendio_id: String(incendio.id),
+        deeplink: `/admin/incendios/${incendio.id}`,
+      },
+    });
+  }
+}

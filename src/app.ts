@@ -37,7 +37,7 @@ import cierreRoutes from './modules/cierre/cierre.routes'
 import plantillasRoutes from './modules/cierre/plantillas.routes'
 
 // Subidas (fotos de incendio)
-import fotosReporteRoutes from './uploads/fotos-reporte.routes'
+// (Integradas en los endpoints principales o removidas temporalmente)
 
 const logger = pino({ level: env.LOG_LEVEL })
 const app = express()
@@ -85,24 +85,30 @@ app.use(contextMiddleware)
 app.use(authMiddleware)
 
 // ---------------- Rutas con prefijo /api ----------------
-app.use('/api/auth', authRoutes)
-app.use('/api', pushRoutes) // POST /api/push/register, /api/push/prefs, /api/push/unregister
-app.use('/api', notificacionesRoutes) // GET /api/notificaciones, POST /api/notificaciones/:id/leer
-app.use('/api', testPushRoutes) // POST /api/test-push
-app.use('/api/usuarios', usuariosRoutes)
+// ---------------- Rutas Notificaciones ----------------
+app.use('/api/notificaciones', notificacionesRoutes) // asumiendo que internamente manejan la raiz /
+app.use('/api', pushRoutes)
+app.use('/api', testPushRoutes)
+
+// ---------------- Rutas Incendios y Fotos ----------------
 app.use('/api/incendios', incendiosRoutes)
-app.use('/api/incendios', fotosReporteRoutes)  // subir/servir fotos de incendios
+// Si necesitas endpoint de subidas separado, añádelo aquí luego
 app.use('/api/seguidores', seguidoresRoutes)
-app.use('/api/catalogos', catalogosRoutes)
+
+// ---------------- Rutas Catálogos y Seguridad ----------------
+app.use('/api/usuarios', usuariosRoutes)
 app.use('/api/roles', rolesRoutes)
-app.use('/api/firms', firmsRoutes)
-app.use('/api/monitor', monitorRoutes)
+app.use('/api/instituciones', institucionesRoutes)
+app.use('/api/catalogos', catalogosRoutes)
+app.use('/api/estados-incendio', estadosIncendioRoutes)
 app.use('/api/departamentos', departamentosRoutes)
+
+// ---------------- Rutas Otros Módulos ----------------
 app.use('/api/cierre', cierreRoutes)
 app.use('/api/cierre-admin', plantillasRoutes)
-app.use('/api/instituciones', institucionesRoutes)
+app.use('/api/firms', firmsRoutes)
 app.use('/api/puntos-calor', puntosCalorRoutes)
-app.use('/api', estadosIncendioRoutes)
+app.use('/api/monitor', monitorRoutes)
 
 // Ruta de prueba de autenticación
 app.get('/api/test-auth', (_req, res) => {

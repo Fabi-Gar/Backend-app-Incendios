@@ -6,7 +6,7 @@ import { Notificacion } from './entities/notificacion.entity';
 const router = Router();
 
 // Obtener notificaciones del usuario autenticado
-router.get('/notificaciones', async (req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
     // 🔒 SEGURIDAD: Usar el usuario del contexto, NO del query param
     const usuario_uuid = res.locals.ctx?.user?.usuario_uuid;
@@ -32,7 +32,7 @@ router.get('/notificaciones', async (req, res, next) => {
 });
 
 // Marcar notificación como leída
-router.post('/notificaciones/:id/leer', async (req, res, next) => {
+router.post('/:id/leer', async (req, res, next) => {
   try {
     const usuario_uuid = res.locals.ctx?.user?.usuario_uuid;
     const notif_id = req.params.id;
@@ -77,7 +77,7 @@ router.post('/notificaciones/:id/leer', async (req, res, next) => {
 });
 
 // Marcar todas como leídas
-router.post('/notificaciones/leer-todas', async (req, res, next) => {
+router.post('/leer-todas', async (req, res, next) => {
   try {
     const usuario_uuid = res.locals.ctx?.user?.usuario_uuid;
 
