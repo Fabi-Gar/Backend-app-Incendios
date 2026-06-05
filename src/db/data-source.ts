@@ -24,7 +24,7 @@ export const AppDataSource = new DataSource({
     max: env.DB_POOL_MAX,
     idleTimeoutMillis: env.DB_POOL_IDLE_MS,
   },
-  synchronize: false,
+  synchronize: true,
   logging: false,
   entities: [
     'src/modules/**/entities/**/*.{ts,js}',   

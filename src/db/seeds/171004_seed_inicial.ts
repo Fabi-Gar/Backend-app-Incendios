@@ -42,9 +42,10 @@ async function main() {
     // ===== ESTADOS (códigos usados por los endpoints)
     await q.query(`
       INSERT INTO estado_incendio (codigo, nombre, orden) VALUES
-      ('INFO_FALSA','Información falsa', 0),
-      ('ACTIVO','Incendio activo', 1),
-      ('CIERRE','Cierre de operaciones', 2)
+      ('REPORTADO', 'Reportado (INAB)', 0),
+      ('INFO_FALSA','Información falsa', 1),
+      ('ACTIVO','Incendio activo', 2),
+      ('CIERRE','Cierre de operaciones', 3)
       ON CONFLICT (codigo) DO NOTHING;
     `)
 

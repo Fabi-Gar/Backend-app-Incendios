@@ -102,6 +102,50 @@ export class Incendio {
 
   // =============================================================================
 
+  // ========================== DATOS INAB (ArcGIS REST) ==========================
+  @Column({ type: 'int', nullable: true, unique: true })
+  inab_objectid!: number | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_globalid!: string | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_tipo_incendio!: string | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_estado_aviso!: string | null
+
+  @Column({ type: 'double precision', nullable: true })
+  inab_coordenada_x!: number | null
+
+  @Column({ type: 'double precision', nullable: true })
+  inab_coordenada_y!: number | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_departamento!: string | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_municipio!: string | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_region!: string | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_subregion!: string | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_institucion!: string | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_reportado_por!: string | null
+
+  @Column({ type: 'timestamptz', nullable: true })
+  inab_fecha_hora!: Date | null
+
+  @Column({ type: 'text', nullable: true })
+  inab_link_googlemaps!: string | null
+  // ==============================================================================
+
   // Fecha de extinción del incendio (cierre final)
   @Column({ type: 'timestamptz', nullable: true })
   extinguido_at!: Date | null
