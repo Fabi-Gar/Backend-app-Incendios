@@ -31,9 +31,10 @@ export async function loadIncendio(
 
   try {
     const incendioRow = await AppDataSource.query(
-      `SELECT incendio_uuid, creado_por_uuid, extinguido_at, titulo
-       FROM incendios
-       WHERE incendio_uuid = $1 AND eliminado_en IS NULL`,
+      `SELECT i.incendio_uuid, i.creado_por_uuid, ctrl.extinguido_at, i.titulo
+       FROM incendios i
+       LEFT JOIN incendio_controles ctrl ON ctrl.incendio_uuid = i.incendio_uuid
+       WHERE i.incendio_uuid = $1 AND i.eliminado_en IS NULL`,
       [incendio_uuid]
     )
 
@@ -68,10 +69,12 @@ export async function loadIncendioComplete(
 
   try {
     const incendioRow = await AppDataSource.query(
-      `SELECT i.incendio_uuid, i.creado_por_uuid, i.extinguido_at, i.titulo,
+      `SELECT i.incendio_uuid, i.creado_por_uuid, ctrl.extinguido_at, i.titulo,
               i.descripcion, i.aprobado, i.estado_incendio_uuid,
-              i.departamento_uuid, i.municipio_uuid
+              loc.departamento, loc.municipio
        FROM incendios i
+       LEFT JOIN incendio_controles ctrl ON ctrl.incendio_uuid = i.incendio_uuid
+       LEFT JOIN incendio_localizaciones loc ON loc.incendio_uuid = i.incendio_uuid
        WHERE i.incendio_uuid = $1 AND i.eliminado_en IS NULL`,
       [incendio_uuid]
     )

@@ -142,7 +142,8 @@ if (hasDepartamentos && hasMunicipios) {
     `)
 
     // ===== INCENDIOS FICTICIOS PARA EL LISTADO "SIN APROBAR"
-    await q.query(`DELETE FROM incendios;`)
+    await q.query('DELETE FROM fotos_reporte;');
+    await q.query('DELETE FROM incendios;');
 
     await q.query(`
       WITH u AS (SELECT usuario_uuid FROM usuarios WHERE email='admin@demo.local' LIMIT 1),

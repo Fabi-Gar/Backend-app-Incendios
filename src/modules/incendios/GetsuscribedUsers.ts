@@ -15,10 +15,12 @@ export async function getSubscribedUsers(
 
     const columnName = columnMap[tipoNotificacion];
 
-    // 1. Obtener departamento y municipio del incendio (desde tabla incendios)
+    // 1. Obtener departamento y municipio del incendio
+    //    (tras el refactor viven como texto en incendio_localizaciones)
     const incendioData = await AppDataSource.query(
-      `SELECT i.departamento_uuid, i.municipio_uuid
+      `SELECT loc.departamento, loc.municipio
        FROM incendios i
+       LEFT JOIN incendio_localizaciones loc ON loc.incendio_uuid = i.incendio_uuid
        WHERE i.incendio_uuid = $1 AND i.eliminado_en IS NULL
        LIMIT 1`,
       [incendio_uuid]
@@ -29,9 +31,9 @@ export async function getSubscribedUsers(
       return []
     }
 
-    const { departamento_uuid, municipio_uuid } = incendioData[0]
+    const { departamento, municipio } = incendioData[0]
 
-    // 2. Buscar usuarios suscritos a ese departamento o municipio
+    // 2. Buscar usuarios suscritos a ese departamento o municipio (por nombre)
     // que tengan activado el tipo de notificación específico
     const query = `
       SELECT DISTINCT up.user_id as usuario_uuid
@@ -44,8 +46,8 @@ export async function getSubscribedUsers(
     `
 
     const usuarios = await AppDataSource.query(query, [
-      departamento_uuid,
-      municipio_uuid
+      departamento,
+      municipio
     ])
 
     return usuarios.map((u: any) => u.usuario_uuid)

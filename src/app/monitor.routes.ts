@@ -109,7 +109,7 @@ router.get('/stats', async (_req: Request, res: Response, next: NextFunction) =>
     // 3) Incendios reportados últimos 7 días
     const incendios_reportados_7d = await incendioRepo
       .createQueryBuilder('i')
-      .where("i.reportado_en >= NOW() - INTERVAL '7 days'")
+      .where("i.creado_en >= NOW() - INTERVAL '7 days'")
       .andWhere('i.eliminado_en IS NULL')
       .getCount()
 

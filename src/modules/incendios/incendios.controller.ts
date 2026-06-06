@@ -18,6 +18,8 @@ import { IncendioSeguidor } from './entities/incendio-seguidor.entity'
 import fs from 'fs/promises'
 import path from 'path'
 import mime from 'mime-types'
+import sharp from 'sharp'
+import { v4 as uuidv4 } from 'uuid'
 import { FotoReporte } from '../../modules/incendios/entities/foto-reporte.entity'
 import { env } from 'process'
 import { mapPgError } from '../../utils/pg-error'
@@ -191,7 +193,29 @@ export class IncendiosController {
         relations: ['localizacion', 'estado_incendio']
       })
 
-      res.json({ total, page, pageSize, items })
+      // Fetch foto_portada efficiently
+      let finalItems = items as any[]
+      if (items.length > 0) {
+        const uuids = items.map(i => i.incendio_uuid)
+        const photos = await AppDataSource.query(`
+          SELECT DISTINCT ON (incendio_uuid) incendio_uuid, url
+          FROM fotos_reporte
+          WHERE incendio_uuid = ANY($1) AND eliminado_en IS NULL
+          ORDER BY incendio_uuid, creado_en ASC
+        `, [uuids])
+        
+        const photoMap = photos.reduce((acc: any, p: any) => {
+          acc[p.incendio_uuid] = p.url
+          return acc
+        }, {})
+
+        finalItems = items.map(i => ({
+          ...i,
+          foto_portada: photoMap[i.incendio_uuid] || null
+        }))
+      }
+
+      res.json({ total, page, pageSize, items: finalItems })
     } catch (err) { next(err) }
   }
 
@@ -217,7 +241,14 @@ export class IncendiosController {
       if (!item || !puedeVer) {
         return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Incendio no disponible' }, requestId: res.locals.ctx?.requestId })
       }
-      res.json(item)
+
+      // Fotos del incendio (incluye las traídas de los attachments del INAB)
+      const fotos = await AppDataSource.getRepository(FotoReporte).find({
+        where: { incendio: { incendio_uuid: uuid }, eliminado_en: IsNull() },
+        order: { creado_en: 'ASC' },
+      })
+
+      res.json({ ...item, fotos })
     } catch (err) { next(err) }
   }
 
@@ -304,12 +335,15 @@ export class IncendiosController {
           }
 
           await ensureUploadsDir()
-          const ext =
-            mime.extension(mimetype) ||
-            (path.extname(originalname || '').replace('.', '') || 'jpg')
-          const filename = `${savedInc.incendio_uuid}-${Date.now()}.${ext}`
+          const filename = `${savedInc.incendio_uuid}-${Date.now()}.webp`
+          
+          // Comprimir y convertir a WebP para máxima eficiencia
+          const compressedBuffer = await sharp(buffer)
+            .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer()
 
-          await fs.writeFile(path.join(UPLOAD_DIR, filename), buffer)
+          await fs.writeFile(path.join(UPLOAD_DIR, filename), compressedBuffer)
           const publicUrl = `${PUBLIC_BASE}/uploads/${filename}`
 
           const savedFoto = await trx.getRepository(FotoReporte).save({
@@ -566,19 +600,19 @@ export class IncendiosController {
 
       try {
         const incendioData = await AppDataSource.query(
-          `SELECT i.municipio_uuid, m.nombre
+          `SELECT loc.municipio
            FROM incendios i
-           LEFT JOIN municipios m ON m.municipio_uuid = i.municipio_uuid
+           LEFT JOIN incendio_localizaciones loc ON loc.incendio_uuid = i.incendio_uuid
            WHERE i.incendio_uuid = $1 AND i.eliminado_en IS NULL`,
           [saved.incendio_uuid]
         )
 
-        if (incendioData?.[0]?.municipio_uuid) {
+        if (incendioData?.[0]?.municipio) {
           await notifyIncendioNuevoMunicipio({
             id: saved.incendio_uuid,
             titulo: saved.titulo ?? undefined,
-            municipioCode: incendioData[0].municipio_uuid,
-            ubicacion: incendioData[0].nombre || 'Sin ubicación',
+            municipioCode: incendioData[0].municipio,
+            ubicacion: incendioData[0].municipio || 'Sin ubicación',
           })
         }
       } catch (notifError) {
@@ -650,7 +684,7 @@ export class IncendiosController {
           END AS cambiado_por
         FROM incendio_estado_historial h
         LEFT JOIN estado_incendio e ON e.estado_incendio_uuid = h.estado_incendio_uuid
-        LEFT JOIN usuarios u ON u.usuario_uuid = h.cambiado_por_uuid
+        LEFT JOIN usuarios u ON u.usuario_uuid = h.cambiado_por
         WHERE h.incendio_uuid = $1 AND h.eliminado_en IS NULL
         ORDER BY h.creado_en DESC
         `,
